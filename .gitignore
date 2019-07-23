@@ -16,3 +16,6 @@ __pycache__
 sync.sh
 .DS_Store
 snapshots
+build
+dist
+*egg-info
