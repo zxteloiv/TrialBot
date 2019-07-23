@@ -1,4 +1,4 @@
-from ..dataset import Dataset
+from training.trial_bot.data.dataset import Dataset
 
 import utils.file_reader as reader_utils
 

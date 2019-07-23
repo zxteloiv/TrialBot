@@ -1,25 +1,26 @@
-from typing import Callable, Optional, Type, Dict, Any, Tuple
+from typing import Callable, Optional, Dict, Any
 import logging
 logging.basicConfig()
 import torch.nn
 import os.path
+import json
 from datetime import datetime
 
-from data_adapter.ns_vocabulary import NSVocabulary
-from data_adapter.iterator import Iterator
-from data_adapter.iterators.random_iterator import RandomIterator
+from .data.dataset import Dataset
+from .data.ns_vocabulary import NSVocabulary
+from .data.iterator import Iterator
+from .data.iterators.random_iterator import RandomIterator
 from tqdm import tqdm
 from enum import Enum
 
-import data_adapter.dataset
-import data_adapter.translator
+from .data.translator import Translator
 
 from allennlp.nn.util import move_to_device
 
 from .opt_parser import get_trial_bot_common_opt_parser
 from .trial_registry import Registry
 from .event_engine import Engine
-import training.trial_bot.extensions as ext_mod
+import training.extensions as ext_mod
 
 class Events(Enum):
     """Predefined events for TrialBot training."""
@@ -71,11 +72,14 @@ class TrialBot:
     def get_default_parser():
         parser = get_trial_bot_common_opt_parser()
         parser.add_argument('models', nargs='*', help='pretrained models for the same setting')
+        parser.add_argument('--dry-run', action="store_true")
+        parser.add_argument('--skip', type=int, help='skip NUM examples for the first iteration, intended for debug use.')
         parser.add_argument('--vocab-dump', help="the file path to save and load the vocab obj")
         return parser
 
     def _default_train_fn(self, iterator: Iterator, model: torch.nn.Module, optimizer):
         device = self.args.device
+        dry_run = self.args.dry_run
 
         def update():
             model.train()
@@ -87,9 +91,10 @@ class TrialBot:
                 batch = move_to_device(batch, device)
 
             output = model(**batch)
-            loss = output['loss']
-            loss.backward()
-            optimizer.step()
+            if not dry_run:
+                loss = output['loss']
+                loss.backward()
+                optimizer.step()
             return output
 
         return update
@@ -100,6 +105,8 @@ class TrialBot:
             model.eval()
             batch = next(iterator)
             nonlocal device
+            if 'target_tokens' in batch:
+                del batch['target_tokens']
             if device >= 0:
                 batch = move_to_device(batch, device)
             output = model(**batch)
@@ -142,15 +149,25 @@ class TrialBot:
             model = model.cuda(args.device)
         self.model = model
 
+        savepath = args.snapshot_dir if args.snapshot_dir else (os.path.join(
+            hparams.SNAPSHOT_PATH,
+            args.dataset,
+            self.name,
+            datetime.now().strftime('%Y%m%d-%H%M%S') + ('-' + args.memo if args.memo else '')
+        ))
+        self.savepath = savepath
+
     def run(self):
         if self.args.test:
             self._test()
         else:
             self._train()
 
-    def _init_vocab(self, dataset: data_adapter.dataset.Dataset,
-                   translator: data_adapter.translator.Translator):
+    def _init_vocab(self,
+                    dataset: Dataset,
+                    translator: Translator):
         args, logger = self.args, self.logger
+        hparams = self.hparams
 
         if args.vocab_dump and os.path.exists(args.vocab_dump):
             logger.info(f"read vocab from file {args.vocab_dump}")
@@ -171,10 +188,12 @@ class TrialBot:
 
                     counter[namespace][w] += 1
 
-            vocab = NSVocabulary(counter, min_count={"tokens": 3})
+            vocab = NSVocabulary(counter, min_count=({"tokens": 3}
+                                                     if not hasattr(hparams, 'MIN_VOCAB_FREQ')
+                                                     else hparams.MIN_VOCAB_FREQ))
 
         if args.vocab_dump:
-            os.makedirs(args.vocab_dump)
+            os.makedirs(args.vocab_dump, exist_ok=True)
             vocab.save_to_files(args.vocab_dump)
         logger.info(str(vocab))
 
@@ -182,17 +201,23 @@ class TrialBot:
 
     def _train(self):
         args, hparams, model = self.args, self.hparams, self.model
+        logger = self.logger
 
-        iterator = RandomIterator(self.train_set, hparams.batch_sz, self.translator)
-        optim = torch.optim.Adam(model.parameters(), hparams.ADAM_LR, hparams.ADAM_BETAS)
+        repeat_iter = not args.debug
+        shuffle_iter = not args.debug
+        iterator = RandomIterator(self.train_set, hparams.batch_sz, self.translator,
+                                  shuffle=shuffle_iter, repeat=repeat_iter)
+        if args.debug and args.skip:
+            iterator.reset(args.skip)
 
-        savepath = args.snapshot_dir if args.snapshot_dir else (os.path.join(
-            hparams.SNAPSHOT_PATH,
-            args.dataset,
-            self.name,
-            datetime.now().strftime('%Y%m%d-%H%M%S') + ('-' + args.memo if args.memo else '')
-        ))
-        self.savepath = savepath
+        if hasattr(hparams, "OPTIM") and hparams.OPTIM == "SGD":
+            logger.info(f"Using SGD optimzer with lr={hparams.SGD_LR}")
+            optim = torch.optim.SGD(model.parameters(), hparams.SGD_LR)
+        else:
+            logger.info(f"Using Adam optimzer with lr={hparams.ADAM_LR} and beta={str(hparams.ADAM_BETAS)}")
+            optim = torch.optim.Adam(model.parameters(), hparams.ADAM_LR, hparams.ADAM_BETAS)
+
+        savepath = self.savepath
         if not os.path.exists(savepath):
             os.makedirs(savepath, mode=0o755)
         vocab_path = os.path.join(savepath, 'vocab')
@@ -210,6 +235,7 @@ class TrialBot:
             self.state.epoch += 1
             engine.fire_event(Events.EPOCH_STARTED, bot=self)
             while True:
+                self.state.iteration += 1
                 engine.fire_event(Events.ITERATION_STARTED, bot=self)
                 self.state.output = updater()
                 engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
@@ -219,11 +245,25 @@ class TrialBot:
             engine.fire_event(Events.EPOCH_COMPLETED, bot=self)
         engine.fire_event(Events.COMPLETED, bot=self)
 
+    def _test(self):
+        hparams, model = self.hparams, self.model
+        iterator = RandomIterator(self.test_set, hparams.batch_sz, self.translator, shuffle=False, repeat=False)
+        updater = self._default_test_fn(iterator, model)
+        with torch.no_grad():
+            while True:
+                output = updater()
+                output = model.decode(output)
+                print(json.dumps(output['predicted_tokens']))
+
+                if iterator.is_new_epoch:
+                    break
+
     def _make_engine(self):
         engine = Engine()
         engine.register_events(*Events)
         # events with greater priorities will get processed earlier.
         engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 100, msg="Epoch started")
+        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 105, msg=("====" * 20))
         engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.current_epoch_logger, 99)
         engine.add_event_handler(Events.STARTED, ext_mod.ext_write_info, 100, msg="TrailBot started")
         engine.add_event_handler(Events.STARTED, ext_mod.time_logger, 99)

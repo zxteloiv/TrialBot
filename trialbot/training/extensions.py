@@ -18,7 +18,10 @@ def every_epoch_model_saver(bot, interval=1):
         torch.save(model.state_dict(), filename)
         bot.logger.info(f"model saved to {filename}")
 
-def loss_reporter(bot):
+def loss_reporter(bot, interval=4):
+    if bot.state.iteration % interval != 0:
+        return
+
     import torch
     import numpy
     output = bot.state.output

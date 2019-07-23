@@ -17,9 +17,9 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 DEFAULT_NON_PADDED_NAMESPACES = ("*tags", "*labels")
-DEFAULT_PADDING_TOKEN = "@@PADDING@@"
 DEFAULT_OOV_TOKEN = "@@UNKNOWN@@"
 NAMESPACE_PADDING_FILE = 'non_padded_namespaces.txt'
+PADDING_TOKEN = "@@PADDING@@"
 START_SYMBOL = '@start@'
 END_SYMBOL = '@end@'
 
@@ -195,7 +195,7 @@ class NSVocabulary:
                  only_include_pretrained_words: bool = False,
                  tokens_to_add: Dict[str, List[str]] = None,
                  min_pretrained_embeddings: Dict[str, int] = None) -> None:
-        self._padding_token = DEFAULT_PADDING_TOKEN
+        self._padding_token = PADDING_TOKEN
         self._oov_token = DEFAULT_OOV_TOKEN
         self._non_padded_namespaces = set(non_padded_namespaces)
         self._token_to_index = _TokenToIndexDefaultDict(self._non_padded_namespaces,

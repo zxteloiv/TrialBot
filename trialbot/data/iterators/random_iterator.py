@@ -4,8 +4,8 @@ from typing import List, Mapping
 import numpy
 import torch
 
-from ..iterator import Iterator
-from ..translator import Translator
+from training.trial_bot.data.iterator import Iterator
+from training.trial_bot.data.translator import Translator
 
 
 class RandomIterator(Iterator):
@@ -101,8 +101,8 @@ class RandomIterator(Iterator):
             return None
         return self._previous_epoch_detail
 
-    def reset(self):
-        self.current_position = 0
+    def reset(self, skip=0):
+        self.current_position = skip
         self.epoch = 0
         self.is_new_epoch = False
 
