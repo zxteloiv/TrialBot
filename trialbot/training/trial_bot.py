@@ -6,14 +6,14 @@ import os.path
 import json
 from datetime import datetime
 
-from .data.dataset import Dataset
-from .data.ns_vocabulary import NSVocabulary
-from .data.iterator import Iterator
-from .data.iterators.random_iterator import RandomIterator
+from trialbot.data.dataset import Dataset
+from trialbot.data.ns_vocabulary import NSVocabulary
+from trialbot.data.iterator import Iterator
+from trialbot.data.iterators.random_iterator import RandomIterator
 from tqdm import tqdm
 from enum import Enum
 
-from .data.translator import Translator
+from trialbot.data.translator import Translator
 
 from allennlp.nn.util import move_to_device
 

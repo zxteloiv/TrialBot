@@ -1,6 +1,6 @@
-from training.trial_bot.data.dataset import Dataset
+from ..dataset import Dataset
 
-import utils.file_reader as reader_utils
+import trialbot.utils.file_reader as reader_utils
 
 class FileDataset(Dataset):
     def __init__(self, filename, lazy=True):

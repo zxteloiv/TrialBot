@@ -1,8 +1,8 @@
 from typing import Callable, Tuple
 
-from training.trial_bot.data.dataset import Dataset
-from training.trial_bot.data.translator import Translator
-from training.exp_runner.hparamset import HyperParamSet
+from trialbot.data.dataset import Dataset
+from trialbot.data.translator import Translator
+from .hparamset import HyperParamSet
 
 class Registry:
     """

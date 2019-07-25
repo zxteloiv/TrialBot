@@ -4,8 +4,8 @@ from typing import List, Mapping
 import numpy
 import torch
 
-from training.trial_bot.data.iterator import Iterator
-from training.trial_bot.data.translator import Translator
+from ..iterator import Iterator
+from ..translator import Translator
 
 
 class RandomIterator(Iterator):

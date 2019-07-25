@@ -1,5 +1,5 @@
 from typing import List, Mapping, Generator, Tuple
-from training.trial_bot.data.ns_vocabulary import NSVocabulary
+from trialbot.data.ns_vocabulary import NSVocabulary
 import torch
 
 class Translator:
