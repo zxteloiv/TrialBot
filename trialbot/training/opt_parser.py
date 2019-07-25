@@ -1,6 +1,6 @@
 import argparse
 
-from training.trial_registry import Registry
+from .trial_registry import Registry
 
 
 def get_trial_bot_common_opt_parser() -> argparse.ArgumentParser:

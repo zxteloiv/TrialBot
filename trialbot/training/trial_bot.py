@@ -1,6 +1,4 @@
 from typing import Callable, Optional, Dict, Any
-import logging
-logging.basicConfig()
 import torch.nn
 import os.path
 import json
@@ -20,7 +18,9 @@ from allennlp.nn.util import move_to_device
 from .opt_parser import get_trial_bot_common_opt_parser
 from .trial_registry import Registry
 from .event_engine import Engine
-import training.extensions as ext_mod
+import trialbot.training.extensions as ext_mod
+import logging
+logging.basicConfig()
 
 class Events(Enum):
     """Predefined events for TrialBot training."""
