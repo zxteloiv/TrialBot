@@ -18,6 +18,7 @@ from allennlp.nn.util import move_to_device
 from .opt_parser import get_trial_bot_common_opt_parser
 from .trial_registry import Registry
 from .event_engine import Engine
+from .updater import TestingUpdater, TrainingUpdater
 import trialbot.training.extensions as ext_mod
 import logging
 logging.basicConfig()
@@ -39,6 +40,31 @@ class State(object):
             setattr(self, k, v)
 
 class TrialBot:
+    """
+    A TrialBot is the direct manager for an experiment, which is responsible for only two requirements,
+    Run and Serve, corresponding to run the experiment or to get loaded by some server.
+
+    A TrialBot maintains several Components, and schedules the experiment procedure.
+    Components are as follows so far,
+    - args: arguments parsed from commandline
+    - hparamset: the designated hyperparameters from the running shell
+    - dataset: specifically train_set, dev_set, test_set
+    - translator: how the dataset should be interpreted.
+    - savepath: where the data will be saved if given, or set by default.
+    - vocab: the vocabulary with several namespaces
+    - models: the list in which all the models for the single experiments are included.
+
+    An experiment is empirically divided into two phase, Training and Testing.
+    They share the same program entry _run_ and is basically of the same routines,
+    1. Do some preprocessing job if any (e.g. save vocab for reusing, makedirs for savepath, etc.)
+    2. Initialize the iterator for running the experiment
+    3. Get the assigned updater or initialize a new one, given the iterator and all the components
+    4. Run the looping until the training ends. This starts an event-driven engine and fires events
+       at some time. All the DIY requirements could be implemented by extensions, which are registered
+       to the engine for some specific events and get run by the event engine when the very event is
+       fired.
+
+    """
     def __init__(self,
                  args = None,
                  trial_name="default_savedir",
@@ -51,22 +77,41 @@ class TrialBot:
         self.args = args
         self.name = trial_name
 
-        self.translator = None
-        self.vocab = None
-        self.train_set = None
-        self.dev_set = None
-        self.test_set = None
+        # self.translator = None
+        # self.vocab = None
+        # self.train_set = None
+        # self.dev_set = None
+        # self.test_set = None
         self.hparams = None
         self.savepath = "."
         self.logger = logging.getLogger(__name__)
 
+        self.updater = None
 
         self.state = State(epoch=0, iteration=0, output=None)
 
         self.get_model = get_model_func
 
         self._engine = self._make_engine()
-        self._init_modules()
+        self._init_components()
+
+    def _make_engine(self):
+        engine = Engine()
+        engine.register_events(*Events)
+        # events with greater priorities will get processed earlier.
+        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 100, msg="Epoch started")
+        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 105, msg=("====" * 20))
+        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.current_epoch_logger, 99)
+        engine.add_event_handler(Events.STARTED, ext_mod.ext_write_info, 100, msg="TrailBot started")
+        engine.add_event_handler(Events.STARTED, ext_mod.time_logger, 99)
+        engine.add_event_handler(Events.COMPLETED, ext_mod.time_logger, 101)
+        engine.add_event_handler(Events.COMPLETED, ext_mod.ext_write_info, 100, msg="TrailBot completed.")
+        engine.add_event_handler(Events.ITERATION_COMPLETED, ext_mod.loss_reporter, 100)
+        return engine
+
+    @property
+    def model(self):
+        return self.models[0]
 
     @staticmethod
     def get_default_parser():
@@ -77,44 +122,7 @@ class TrialBot:
         parser.add_argument('--vocab-dump', help="the file path to save and load the vocab obj")
         return parser
 
-    def _default_train_fn(self, iterator: Iterator, model: torch.nn.Module, optimizer):
-        device = self.args.device
-        dry_run = self.args.dry_run
-
-        def update():
-            model.train()
-            optimizer.zero_grad()
-            batch: Dict[str, torch.Tensor] = next(iterator)
-
-            nonlocal device
-            if device >= 0:
-                batch = move_to_device(batch, device)
-
-            output = model(**batch)
-            if not dry_run:
-                loss = output['loss']
-                loss.backward()
-                optimizer.step()
-            return output
-
-        return update
-
-    def _default_test_fn(self, iterator: Iterator, model: torch.nn.Module):
-        device = self.args.device
-        def update():
-            model.eval()
-            batch = next(iterator)
-            nonlocal device
-            if 'target_tokens' in batch:
-                del batch['target_tokens']
-            if device >= 0:
-                batch = move_to_device(batch, device)
-            output = model(**batch)
-            return output
-
-        return update
-
-    def _init_modules(self):
+    def _init_components(self):
         """
         Start a trial directly.
         """
@@ -140,14 +148,8 @@ class TrialBot:
         vocab = self._init_vocab(train_set, translator)
         self.vocab = vocab
         translator.index_with_vocab(vocab)
-        model = self.get_model(hparams, vocab)
 
-        if args.models:
-            model.load_state_dict(torch.load(args.models[0]))
-
-        if args.device >= 0:
-            model = model.cuda(args.device)
-        self.model = model
+        self.models = self._init_models(hparams, vocab)
 
         savepath = args.snapshot_dir if args.snapshot_dir else (os.path.join(
             hparams.SNAPSHOT_PATH,
@@ -156,12 +158,6 @@ class TrialBot:
             datetime.now().strftime('%Y%m%d-%H%M%S') + ('-' + args.memo if args.memo else '')
         ))
         self.savepath = savepath
-
-    def run(self):
-        if self.args.test:
-            self._test()
-        else:
-            self._train()
 
     def _init_vocab(self,
                     dataset: Dataset,
@@ -199,16 +195,55 @@ class TrialBot:
 
         return vocab
 
-    def _train(self):
+    def _init_models(self, hparams, vocab):
+        args = self.args
+        models = self.get_model(hparams, vocab)
+        if not isinstance(models, list):
+            models = [models]
+
+        if args.models:
+            for model, model_path in zip(models, args.models):
+                model.load_state_dict(torch.load(model_path))
+
+        if args.device >= 0:
+            models = [model.cuda(args.device) for model in models]
+        return models
+
+    def run(self):
+        args, hparams = self.args, self.hparams
+
+        if self.args.test:
+            # testing procedure
+            # 1. init iterator; 2. init updater; 3. run the testing engine
+            hparams, model = self.hparams, self.model
+            iterator = RandomIterator(self.test_set, hparams.batch_sz, self.translator, shuffle=False, repeat=False)
+            updater = self.updater if self.updater is not None else self._default_test_updater(iterator)
+            self._testing_engine_loop(iterator, updater)
+
+        else:
+            # training procedure
+            # 1. save vocab; 2. init iterator; 3. init updater with iterator; 4. start main engine
+            savepath = self.savepath
+            if not os.path.exists(savepath):
+                os.makedirs(savepath, mode=0o755)
+            vocab_path = os.path.join(savepath, 'vocab')
+            if not os.path.exists(vocab_path):
+                os.makedirs(vocab_path, mode=0o755)
+                self.vocab.save_to_files(vocab_path)
+
+            repeat_iter = not args.debug
+            shuffle_iter = not args.debug
+            iterator = RandomIterator(self.train_set, self.hparams.batch_sz, self.translator,
+                                      shuffle=shuffle_iter, repeat=repeat_iter)
+            if args.debug and args.skip:
+                iterator.reset(args.skip)
+
+            updater = self.updater if self.updater is not None else self._default_train_updater(iterator)
+            self._training_engine_loop(iterator, updater, hparams.TRAINING_LIMIT)
+
+    def _default_train_updater(self, iterator):
         args, hparams, model = self.args, self.hparams, self.model
         logger = self.logger
-
-        repeat_iter = not args.debug
-        shuffle_iter = not args.debug
-        iterator = RandomIterator(self.train_set, hparams.batch_sz, self.translator,
-                                  shuffle=shuffle_iter, repeat=repeat_iter)
-        if args.debug and args.skip:
-            iterator.reset(args.skip)
 
         if hasattr(hparams, "OPTIM") and hparams.OPTIM == "SGD":
             logger.info(f"Using SGD optimzer with lr={hparams.SGD_LR}")
@@ -217,18 +252,18 @@ class TrialBot:
             logger.info(f"Using Adam optimzer with lr={hparams.ADAM_LR} and beta={str(hparams.ADAM_BETAS)}")
             optim = torch.optim.Adam(model.parameters(), hparams.ADAM_LR, hparams.ADAM_BETAS)
 
-        savepath = self.savepath
-        if not os.path.exists(savepath):
-            os.makedirs(savepath, mode=0o755)
-        vocab_path = os.path.join(savepath, 'vocab')
-        if not os.path.exists(vocab_path):
-            os.makedirs(vocab_path, mode=0o755)
-            self.vocab.save_to_files(vocab_path)
+        device = args.device
+        dry_run = args.dry_run
+        updater = TrainingUpdater(model, iterator, optim, device, dry_run)
+        return updater
 
-        updater = self._default_train_fn(iterator, model, optim)
-        self._engine_loop(iterator, updater, hparams.TRAINING_LIMIT)
+    def _default_test_updater(self, iterator: Iterator):
+        args, model = self.args, self.model
+        device = args.device
+        updater = TestingUpdater(model, iterator, None, device)
+        return updater
 
-    def _engine_loop(self, iterator, updater, max_epoch):
+    def _training_engine_loop(self, iterator, updater, max_epoch):
         engine = self._engine
         engine.fire_event(Events.STARTED, bot=self)
         while iterator.epoch < max_epoch:
@@ -245,10 +280,9 @@ class TrialBot:
             engine.fire_event(Events.EPOCH_COMPLETED, bot=self)
         engine.fire_event(Events.COMPLETED, bot=self)
 
-    def _test(self):
-        hparams, model = self.hparams, self.model
-        iterator = RandomIterator(self.test_set, hparams.batch_sz, self.translator, shuffle=False, repeat=False)
-        updater = self._default_test_fn(iterator, model)
+    def _testing_engine_loop(self, iterator, updater):
+        engine = self._engine
+        model = self.model
         with torch.no_grad():
             while True:
                 output = updater()
@@ -257,21 +291,6 @@ class TrialBot:
 
                 if iterator.is_new_epoch:
                     break
-
-    def _make_engine(self):
-        engine = Engine()
-        engine.register_events(*Events)
-        # events with greater priorities will get processed earlier.
-        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 100, msg="Epoch started")
-        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 105, msg=("====" * 20))
-        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.current_epoch_logger, 99)
-        engine.add_event_handler(Events.STARTED, ext_mod.ext_write_info, 100, msg="TrailBot started")
-        engine.add_event_handler(Events.STARTED, ext_mod.time_logger, 99)
-        engine.add_event_handler(Events.COMPLETED, ext_mod.time_logger, 101)
-        engine.add_event_handler(Events.COMPLETED, ext_mod.ext_write_info, 100, msg="TrailBot completed.")
-        engine.add_event_handler(Events.EPOCH_COMPLETED, ext_mod.every_epoch_model_saver, 100)
-        engine.add_event_handler(Events.ITERATION_COMPLETED, ext_mod.loss_reporter, 100)
-        return engine
 
     def attach_extension(self,
                          event_name: str = Events.ITERATION_COMPLETED,
