@@ -1,16 +1,20 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union, Any
 from trialbot.utils.move_to_device import move_to_device
-import torch
+import torch.nn
 
 class Updater:
-    def __init__(self, models, iterators, optims, device=-1):
+    def __init__(self,
+                 models: Union[List[torch.nn.Module]],
+                 iterators,
+                 optims,
+                 device: int = -1):
         self._models = models if isinstance(models, list) else [models]
         self._device = device
         self._iterators = iterators if isinstance(iterators, list) else [iterators]
         self._optims = optims if isinstance(optims, list) else [optims]
 
     def __call__(self):
-        self.update()
+        return self.update()
 
     def update(self):
         raise NotImplemented
