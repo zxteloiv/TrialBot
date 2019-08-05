@@ -6,19 +6,14 @@ from datetime import datetime
 
 from trialbot.data.dataset import Dataset
 from trialbot.data.ns_vocabulary import NSVocabulary
-from trialbot.data.iterator import Iterator
-from trialbot.data.iterators.random_iterator import RandomIterator
 from tqdm import tqdm
 from enum import Enum
 
 from trialbot.data.translator import Translator
 
-from allennlp.nn.util import move_to_device
-
 from .opt_parser import get_trial_bot_common_opt_parser
 from .trial_registry import Registry
 from .event_engine import Engine
-from .updater import TestingUpdater, TrainingUpdater
 import trialbot.training.extensions as ext_mod
 import logging
 logging.basicConfig()
@@ -224,6 +219,7 @@ class TrialBot:
         if self.args.test:
             # testing procedure
             # 1. init updater; 2. run the testing engine
+            from .updater import TestingUpdater
             updater = self.updater if self.updater is not None else TestingUpdater.from_bot(self)
             self._testing_engine_loop(updater)
 
@@ -238,6 +234,7 @@ class TrialBot:
                 os.makedirs(vocab_path, mode=0o755)
                 self.vocab.save_to_files(vocab_path)
 
+            from .updater import TrainingUpdater
             updater = self.updater if self.updater is not None else TrainingUpdater.from_bot(self)
             self._training_engine_loop(updater, hparams.TRAINING_LIMIT)
 
