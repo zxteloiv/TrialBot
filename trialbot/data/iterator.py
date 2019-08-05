@@ -58,6 +58,8 @@ class Iterator(object):
     iteration.
 
     """
+    def __init__(self):
+        self.is_new_epoch = False
 
     def __iter__(self):
         """Returns self."""

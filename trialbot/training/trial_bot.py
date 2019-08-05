@@ -55,14 +55,23 @@ class TrialBot:
     - models: the list in which all the models for the single experiments are included.
 
     An experiment is empirically divided into two phase, Training and Testing.
-    They share the same program entry _run_ and is basically of the same routines,
+    They share the same program entry _run_ and basically consist of the similar routines,
     1. Do some preprocessing job if any (e.g. save vocab for reusing, makedirs for savepath, etc.)
-    2. Initialize the iterator for running the experiment
-    3. Get the assigned updater or initialize a new one, given the iterator and all the components
-    4. Run the looping until the training ends. This starts an event-driven engine and fires events
+    2. Initialize the updater for running the experiment.
+        1) For a standard updater, the classmethod of the updater already implements the initialization
+        of the iterators and optimizers.
+        2) For a custom updater, the class initialization could be anywhere given the bot with its components.
+        Then the custom updater must be injected into the bot with property assignment. like
+
+        ```python
+            bot.updater = Updater(bot)
+        ```
+    3. Run the looping until the training ends. This starts an event-driven engine and fires events
        at some time. All the DIY requirements could be implemented by extensions, which are registered
        to the engine for some specific events and get run by the event engine when the very event is
        fired.
+       By default, the loop contains some epochs and some iterations of each epoch.
+       The loop relies on the updater, and start a new epoch only after the updater raise an StopIteration exception.
 
     """
     def __init__(self,
@@ -214,15 +223,13 @@ class TrialBot:
 
         if self.args.test:
             # testing procedure
-            # 1. init iterator; 2. init updater; 3. run the testing engine
-            hparams, model = self.hparams, self.model
-            iterator = RandomIterator(self.test_set, hparams.batch_sz, self.translator, shuffle=False, repeat=False)
-            updater = self.updater if self.updater is not None else self._default_test_updater(iterator)
-            self._testing_engine_loop(iterator, updater)
+            # 1. init updater; 2. run the testing engine
+            updater = self.updater if self.updater is not None else TestingUpdater.from_bot(self)
+            self._testing_engine_loop(updater)
 
         else:
             # training procedure
-            # 1. save vocab; 2. init iterator; 3. init updater with iterator; 4. start main engine
+            # 1. save vocab; 2. init updater; 3. start main engine
             savepath = self.savepath
             if not os.path.exists(savepath):
                 os.makedirs(savepath, mode=0o755)
@@ -231,66 +238,35 @@ class TrialBot:
                 os.makedirs(vocab_path, mode=0o755)
                 self.vocab.save_to_files(vocab_path)
 
-            repeat_iter = not args.debug
-            shuffle_iter = not args.debug
-            iterator = RandomIterator(self.train_set, self.hparams.batch_sz, self.translator,
-                                      shuffle=shuffle_iter, repeat=repeat_iter)
-            if args.debug and args.skip:
-                iterator.reset(args.skip)
+            updater = self.updater if self.updater is not None else TrainingUpdater.from_bot(self)
+            self._training_engine_loop(updater, hparams.TRAINING_LIMIT)
 
-            updater = self.updater if self.updater is not None else self._default_train_updater(iterator)
-            self._training_engine_loop(iterator, updater, hparams.TRAINING_LIMIT)
-
-    def _default_train_updater(self, iterator):
-        args, hparams, model = self.args, self.hparams, self.model
-        logger = self.logger
-
-        if hasattr(hparams, "OPTIM") and hparams.OPTIM == "SGD":
-            logger.info(f"Using SGD optimzer with lr={hparams.SGD_LR}")
-            optim = torch.optim.SGD(model.parameters(), hparams.SGD_LR)
-        else:
-            logger.info(f"Using Adam optimzer with lr={hparams.ADAM_LR} and beta={str(hparams.ADAM_BETAS)}")
-            optim = torch.optim.Adam(model.parameters(), hparams.ADAM_LR, hparams.ADAM_BETAS)
-
-        device = args.device
-        dry_run = args.dry_run
-        updater = TrainingUpdater(model, iterator, optim, device, dry_run)
-        return updater
-
-    def _default_test_updater(self, iterator: Iterator):
-        args, model = self.args, self.model
-        device = args.device
-        updater = TestingUpdater(model, iterator, None, device)
-        return updater
-
-    def _training_engine_loop(self, iterator, updater, max_epoch):
+    def _training_engine_loop(self, updater, max_epoch):
         engine = self._engine
         engine.fire_event(Events.STARTED, bot=self)
-        while iterator.epoch < max_epoch:
+        while self.state.epoch < max_epoch:
             self.state.epoch += 1
             engine.fire_event(Events.EPOCH_STARTED, bot=self)
             while True:
                 self.state.iteration += 1
                 engine.fire_event(Events.ITERATION_STARTED, bot=self)
-                self.state.output = updater()
-                engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
-                if iterator.is_new_epoch:
+                try:
+                    self.state.output = updater()
+                except StopIteration:
                     break
+                finally:
+                    engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
 
             engine.fire_event(Events.EPOCH_COMPLETED, bot=self)
         engine.fire_event(Events.COMPLETED, bot=self)
 
-    def _testing_engine_loop(self, iterator, updater):
+    def _testing_engine_loop(self, updater):
         engine = self._engine
         model = self.model
         with torch.no_grad():
-            while True:
-                output = updater()
+            for output in updater():
                 output = model.decode(output)
                 print(json.dumps(output['predicted_tokens']))
-
-                if iterator.is_new_epoch:
-                    break
 
     def attach_extension(self,
                          event_name: str = Events.ITERATION_COMPLETED,

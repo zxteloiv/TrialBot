@@ -35,6 +35,7 @@ class RandomIterator(Iterator):
 
     def __init__(self, dataset, batch_size, translator,
                  repeat=True, shuffle=True):
+        super(RandomIterator, self).__init__()
         self.dataset = dataset
         self.batch_size = batch_size
         self.translator: Translator = translator
