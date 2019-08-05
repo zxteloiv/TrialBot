@@ -244,6 +244,7 @@ class TrialBot:
         while self.state.epoch < max_epoch:
             self.state.epoch += 1
             engine.fire_event(Events.EPOCH_STARTED, bot=self)
+            updater.start_epoch()
             while True:
                 self.state.iteration += 1
                 engine.fire_event(Events.ITERATION_STARTED, bot=self)

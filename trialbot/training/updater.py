@@ -15,23 +15,34 @@ class Updater:
         self._iterators: List[Iterator] = iterators if isinstance(iterators, list) else [iterators]
         self._optims = optims if isinstance(optims, list) else [optims]
 
+        self._epoch_ended = False
+
+    def start_epoch(self):
+        self._epoch_ended = False
+
     def __call__(self):
-        return next(self)
+        yield from self
 
     def __iter__(self):
         """Return self. Support iteration for only once."""
         return self
 
     def __next__(self):
+        if self._epoch_ended:
+            raise StopIteration
+
         return self.update_epoch()
 
     def update_epoch(self):
         """
         Keep updating until the epoch ends.
-        When the epoch is ending, the method should raise StopIteration.
+        When the epoch has ended, the method should call stop_epoch.
         :return:
         """
         raise NotImplementedError
+
+    def stop_epoch(self):
+        self._epoch_ended = True
 
     @classmethod
     def from_bot(cls, bot: TrialBot) -> 'Updater':
@@ -40,10 +51,10 @@ class Updater:
 class TestingUpdater(Updater):
     def update_epoch(self):
         model, iterator, device = self._models[0], self._iterators[0], self._device
-        if iterator.is_new_epoch:
-            raise StopIteration
         model.eval()
         batch = next(iterator)
+        if iterator.is_new_epoch:
+            self.stop_epoch()
         if 'target_tokens' in batch:
             del batch['target_tokens']
         if device >= 0:
@@ -70,7 +81,7 @@ class TrainingUpdater(Updater):
     def update_epoch(self):
         model, optim, iterator = self._models[0], self._optims[0], self._iterators[0]
         if iterator.is_new_epoch:
-            raise StopIteration
+            self.stop_epoch()
 
         device = self._device
         model.train()
