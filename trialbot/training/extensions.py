@@ -33,3 +33,11 @@ def loss_reporter(bot, interval=4):
 
     bot.logger.info(f"Epoch: {bot.state.epoch}, Iteration: {bot.state.iteration}, Loss: {loss:.4f}")
 
+def legacy_testing_output(bot):
+    import json
+    output = bot.state.output
+    if output is None:
+        return
+    model = bot.model
+    output = model.decode(output)
+    print(json.dumps(output['predicted_tokens']))

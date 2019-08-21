@@ -251,6 +251,7 @@ class TrialBot:
                 try:
                     self.state.output = updater()
                 except StopIteration:
+                    self.state.output = None
                     break
                 finally:
                     engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
@@ -260,17 +261,33 @@ class TrialBot:
 
     def _testing_engine_loop(self, updater):
         engine = self._engine
-        model = self.model
         with torch.no_grad():
-            for output in updater():
-                output = model.decode(output)
-                print(json.dumps(output['predicted_tokens']))
+            engine.fire_event(Events.STARTED, bot=self)
+            engine.fire_event(Events.EPOCH_STARTED, bot=self)
+            updater.start_epoch()
+            while True:
+                self.state.iteration += 1
+                engine.fire_event(Events.ITERATION_STARTED, bot=self)
+                try:
+                    self.state.output = updater()
+                except StopIteration:
+                    self.state.output = None
+                    break
+                finally:
+                    engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
+
+            engine.fire_event(Events.EPOCH_COMPLETED, bot=self)
+            engine.fire_event(Events.COMPLETED, bot=self)
 
     def attach_extension(self,
                          event_name: str = Events.ITERATION_COMPLETED,
                          priority: int = 100,):
+        """Used as a decorator only. To add extension directly, use add_event_handler instead."""
         def decorator(handler):
             self._engine.add_event_handler(event_name, handler, priority)
             return handler
         return decorator
+
+    def add_event_handler(self, *args, **kwargs):
+        self._engine.add_event_handler(*args, **kwargs)
 
