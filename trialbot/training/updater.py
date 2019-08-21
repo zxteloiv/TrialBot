@@ -21,6 +21,21 @@ class Updater:
         self._epoch_ended = False
 
     def __call__(self):
+        """
+        If called by __call__, Updater will returns a iterator.
+        Therefore supporting the following paradigm for training or testing loops.
+
+        ```python
+        for output in updater():
+            # do stuff with output
+        ```
+
+        The effect is the same as iter(updater).
+
+        If you want only the next example, use next(updater) instead.
+
+        :return:
+        """
         yield from self
 
     def __iter__(self):

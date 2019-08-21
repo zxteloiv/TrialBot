@@ -249,7 +249,7 @@ class TrialBot:
                 self.state.iteration += 1
                 engine.fire_event(Events.ITERATION_STARTED, bot=self)
                 try:
-                    self.state.output = updater()
+                    self.state.output = next(updater)
                 except StopIteration:
                     self.state.iteration -= 1
                     self.state.output = None
@@ -270,7 +270,7 @@ class TrialBot:
                 self.state.iteration += 1
                 engine.fire_event(Events.ITERATION_STARTED, bot=self)
                 try:
-                    self.state.output = updater()
+                    self.state.output = next(updater)
                 except StopIteration:
                     self.state.iteration -= 1
                     self.state.output = None
