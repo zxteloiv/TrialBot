@@ -251,6 +251,7 @@ class TrialBot:
                 try:
                     self.state.output = updater()
                 except StopIteration:
+                    self.state.iteration -= 1
                     self.state.output = None
                     break
                 finally:
@@ -271,6 +272,7 @@ class TrialBot:
                 try:
                     self.state.output = updater()
                 except StopIteration:
+                    self.state.iteration -= 1
                     self.state.output = None
                     break
                 finally:
