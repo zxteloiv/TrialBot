@@ -70,7 +70,7 @@ class TestingUpdater(Updater):
 
         hparams, model = self.hparams, self.model
         iterator = RandomIterator(self.test_set, hparams.batch_sz, self.translator, shuffle=False, repeat=False)
-        updater = TestingUpdater(model, iterator, None, device)
+        updater = cls(model, iterator, None, device)
         return updater
 
 class TrainingUpdater(Updater):
@@ -120,7 +120,7 @@ class TrainingUpdater(Updater):
         if args.debug and args.skip:
             iterator.reset(args.skip)
 
-        updater = TrainingUpdater(model, iterator, optim, device, dry_run)
+        updater = cls(model, iterator, optim, device, dry_run)
         return updater
 
 
