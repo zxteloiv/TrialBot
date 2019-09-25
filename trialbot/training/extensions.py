@@ -25,11 +25,16 @@ def loss_reporter(bot, interval=4):
     import torch
     import numpy
     output = bot.state.output
-    loss = output['loss']
+    if output is None:
+        return
+
+    loss = output.get('loss')
     if isinstance(loss, torch.Tensor):
         loss = loss.item()
     elif isinstance(loss, numpy.ndarray):
         loss = loss.item()
+    else:
+        return
 
     bot.logger.info(f"Epoch: {bot.state.epoch}, Iteration: {bot.state.iteration}, Loss: {loss:.4f}")
 
