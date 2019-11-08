@@ -3,9 +3,16 @@ import json
 
 class HyperParamSet:
     def __str__(self):
-        json_obj = dict((attr, getattr(self, attr)) for attr in dir(self)
-                        if hasattr(self, attr) and not attr.startswith('_'))
-        return json.dumps(json_obj)
+        obj = {}
+        for attr in dir(self):
+            if attr.startswith('_'):
+                continue
+
+            val = getattr(self, attr)
+            if any(isinstance(val, t) for t in (tuple, list, dict, int, str, float)):
+                obj[attr] = str(val)
+
+        return "\n".join("%s: %s" % (k, v) for k, v in obj.items())
 
     @staticmethod
     def common_settings():
