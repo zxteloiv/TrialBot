@@ -15,12 +15,12 @@ class HyperParamSet:
         return "\n".join("%s: %s" % (k, v) for k, v in obj.items())
 
     @staticmethod
-    def common_settings():
+    def common_settings(root_path=None):
         import os.path
         hparams = HyperParamSet()
 
         hparams.DEVICE = -1
-        ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+        ROOT = '.' if root_path is None else root_path
         hparams.ROOT = ROOT
         hparams.SNAPSHOT_PATH = os.path.join(ROOT, 'snapshots')
 
