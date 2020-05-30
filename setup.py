@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="trialbot",
-    version="0.0.10",
+    version="0.1.0",
     author="zxteloiv",
     author_email="zxteloiv@gmail.com",
     description="A lightweight training framework for PyTorch",

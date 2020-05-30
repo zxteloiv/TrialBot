@@ -7,6 +7,8 @@ import torch
 from ..iterator import Iterator
 from ..translator import Translator
 
+import logging
+
 
 class RandomIterator(Iterator):
 
@@ -42,10 +44,15 @@ class RandomIterator(Iterator):
         self._repeat = repeat
         self._shuffle = shuffle
         self._order = None
+        self.logger = logging.getLogger(__name__)
 
         self.reset()
 
     def __next__(self):
+        if self._epoch_size == 0:
+            self.logger.warning("Given dataset is empty. Nothing to yield but only raising StopIteration")
+            raise StopIteration
+
         if not self._repeat and self.epoch > 0:
             raise StopIteration
 

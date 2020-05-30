@@ -202,7 +202,7 @@ class TrialBot:
     def _init_models(self, hparams, vocab):
         args = self.args
         models = self.get_model(hparams, vocab)
-        if not isinstance(models, list):
+        if not isinstance(models, list) and not isinstance(models, tuple):
             models = [models]
 
         if args.models:
