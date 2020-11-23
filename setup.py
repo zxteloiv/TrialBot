@@ -1,11 +1,12 @@
 import setuptools
+import trialbot
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="trialbot",
-    version="0.1.0",
+    version=trialbot.__version__,
     author="zxteloiv",
     author_email="zxteloiv@gmail.com",
     description="A lightweight training framework for PyTorch",

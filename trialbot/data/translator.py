@@ -11,14 +11,14 @@ class Translator:
         self.vocab: NSVocabulary = None
 
     def generate_namespace_tokens(self, example) -> Generator[Tuple[str, str], None, None]:
-        raise NotImplemented
+        raise NotImplementedError
 
     def index_with_vocab(self, vocab: NSVocabulary):
         self.vocab = vocab
 
     def to_tensor(self, example) -> Mapping[str, torch.Tensor]:
-        raise NotImplemented
+        raise NotImplementedError
 
     def batch_tensor(self, tensors: List[Mapping[str, torch.Tensor]]) -> Mapping[str, torch.Tensor]:
-        raise NotImplemented
+        raise NotImplementedError
 
