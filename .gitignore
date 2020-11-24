@@ -20,3 +20,4 @@ snapshots
 build
 dist
 *egg-info
+Makefile

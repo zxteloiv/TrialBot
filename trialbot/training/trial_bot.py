@@ -188,9 +188,7 @@ class TrialBot:
 
                     counter[namespace][w] += 1
 
-            vocab = NSVocabulary(counter, min_count=({"tokens": 3}
-                                                     if not hasattr(hparams, 'MIN_VOCAB_FREQ')
-                                                     else hparams.MIN_VOCAB_FREQ))
+            vocab = NSVocabulary(counter, **hparams.NS_VOCAB_KWARGS)
 
         if args.vocab_dump:
             os.makedirs(args.vocab_dump, exist_ok=True)

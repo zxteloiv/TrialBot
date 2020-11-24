@@ -28,7 +28,6 @@ class HyperParamSet:
         hparams.TRAINING_LIMIT = 500  # in num of epochs
         hparams.SAVE_INTERVAL = (100, 'iteration')
         hparams.batch_sz = 128
-        hparams.vocab_min_freq = 3
 
         hparams.ADAM_LR = 1e-3
         hparams.ADAM_BETAS = (.9, .98)
@@ -38,6 +37,8 @@ class HyperParamSet:
 
         hparams.SGD_LR = 1e-2
         hparams.DATA_PATH = os.path.join(ROOT, 'data')
+
+        hparams.NS_VOCAB_KWARGS = dict()
 
         return hparams
 
