@@ -19,11 +19,13 @@ def open_json(infile):
 
 
 def open_file(filename: str):
+    # assuming the data resides in a text file, if you want other file types
+    # you'd better reimplement another reading utility.
     assert isinstance(filename, str)
     if filename.endswith('.bz2'):
         f = bz2.BZ2File(filename)
     elif filename.endswith('.gz'):
-        f = gzip.GzipFile(filename)
+        f = gzip.GzipFile(filename, "r")    # by default GzipFile reads data with "rb" mode
     else:
         f = open(filename)
 
