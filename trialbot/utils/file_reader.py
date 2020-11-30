@@ -23,9 +23,9 @@ def open_file(filename: str):
     # you'd better reimplement another reading utility.
     assert isinstance(filename, str)
     if filename.endswith('.bz2'):
-        f = bz2.BZ2File(filename)
+        f = bz2.open(filename, 'rt')    # by default, bz2 and gzip use binary mode (either "r" == "rb"),
     elif filename.endswith('.gz'):
-        f = gzip.GzipFile(filename, "r")    # by default GzipFile reads data with "rb" mode
+        f = gzip.open(filename, 'rt')
     else:
         f = open(filename)
 
