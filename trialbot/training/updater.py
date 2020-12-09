@@ -70,8 +70,6 @@ class TestingUpdater(Updater):
         batch = next(iterator)
         if iterator.is_new_epoch:
             self.stop_epoch()
-        if 'target_tokens' in batch:
-            del batch['target_tokens']
         if device >= 0:
             batch = move_to_device(batch, device)
         output = model(**batch)
@@ -116,15 +114,19 @@ class TrainingUpdater(Updater):
     @classmethod
     def from_bot(cls, bot: TrialBot) -> 'TrainingUpdater':
         self = bot
-        args, hparams, model = self.args, self.hparams, self.model
+        args, p, model = self.args, self.hparams, self.model
         logger = self.logger
 
-        if hasattr(hparams, "OPTIM") and hparams.OPTIM == "SGD":
-            logger.info(f"Using SGD optimzer with lr={hparams.SGD_LR}")
-            optim = torch.optim.SGD(model.parameters(), hparams.SGD_LR)
+        if hasattr(p, "OPTIM") and p.OPTIM == "SGD":
+            logger.info(f"Using SGD optimzer with lr={p.SGD_LR}")
+            optim = torch.optim.SGD(model.parameters(), p.SGD_LR, weight_decay=p.WEIGHT_DECAY)
+        elif hasattr(p, "OPTIM") and isinstance(p.OPTIM, str) and p.OPTIM.lower() == "RAdam":
+            from radam import RAdam
+            optim = RAdam(model.parameters(), lr=p.ADAM_LR, weight_decay=p.WEIGHT_DECAY)
+            logger.info(f"Using RAdam optimzer with lr={p.SGD_LR}")
         else:
-            logger.info(f"Using Adam optimzer with lr={hparams.ADAM_LR} and beta={str(hparams.ADAM_BETAS)}")
-            optim = torch.optim.Adam(model.parameters(), hparams.ADAM_LR, hparams.ADAM_BETAS)
+            logger.info(f"Using Adam optimzer with lr={p.ADAM_LR} and beta={str(p.ADAM_BETAS)}")
+            optim = torch.optim.Adam(model.parameters(), p.ADAM_LR, p.ADAM_BETAS, weight_decay=p.WEIGHT_DECAY)
 
         device = args.device
         dry_run = args.dry_run

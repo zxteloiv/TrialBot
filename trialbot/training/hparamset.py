@@ -1,5 +1,3 @@
-import json
-
 
 class HyperParamSet:
     def __str__(self):
@@ -33,6 +31,7 @@ class HyperParamSet:
         hparams.ADAM_BETAS = (.9, .98)
         hparams.ADAM_EPS = 1e-9
 
+        hparams.WEIGHT_DECAY = 0.
         hparams.GRAD_CLIPPING = 5
 
         hparams.SGD_LR = 1e-2
