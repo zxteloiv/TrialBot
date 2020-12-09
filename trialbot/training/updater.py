@@ -117,13 +117,13 @@ class TrainingUpdater(Updater):
         args, p, model = self.args, self.hparams, self.model
         logger = self.logger
 
-        if hasattr(p, "OPTIM") and p.OPTIM == "SGD":
+        if hasattr(p, "OPTIM") and isinstance(p.OPTIM, str) and p.OPTIM.lower() == "sgd":
             logger.info(f"Using SGD optimzer with lr={p.SGD_LR}")
             optim = torch.optim.SGD(model.parameters(), p.SGD_LR, weight_decay=p.WEIGHT_DECAY)
-        elif hasattr(p, "OPTIM") and isinstance(p.OPTIM, str) and p.OPTIM.lower() == "RAdam":
+        elif hasattr(p, "OPTIM") and isinstance(p.OPTIM, str) and p.OPTIM.lower() == "radam":
             from radam import RAdam
             optim = RAdam(model.parameters(), lr=p.ADAM_LR, weight_decay=p.WEIGHT_DECAY)
-            logger.info(f"Using RAdam optimzer with lr={p.SGD_LR}")
+            logger.info(f"Using RAdam optimzer with lr={p.ADAM_LR}")
         else:
             logger.info(f"Using Adam optimzer with lr={p.ADAM_LR} and beta={str(p.ADAM_BETAS)}")
             optim = torch.optim.Adam(model.parameters(), p.ADAM_LR, p.ADAM_BETAS, weight_decay=p.WEIGHT_DECAY)
