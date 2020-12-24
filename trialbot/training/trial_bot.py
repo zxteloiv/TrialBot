@@ -73,6 +73,7 @@ class TrialBot:
                  args = None,
                  trial_name="default_savedir",
                  get_model_func: Optional[Callable[[Any, NSVocabulary], torch.nn.Module]] = None,
+                 clean_engine: bool = False,
                  ):
         if args is None:
             parser = TrialBot.get_default_parser()
@@ -96,21 +97,22 @@ class TrialBot:
 
         self.get_model = get_model_func
 
-        self._engine = self._make_engine()
+        self._engine = self._make_engine(clean=clean_engine)
         self._init_components()
 
-    def _make_engine(self):
+    def _make_engine(self, clean: bool = False):
         engine = Engine()
         engine.register_events(*Events)
         # events with greater priorities will get processed earlier.
-        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 100, msg="Epoch started")
-        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 105, msg=("====" * 20))
-        engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.current_epoch_logger, 99)
-        engine.add_event_handler(Events.STARTED, ext_mod.ext_write_info, 100, msg="TrailBot started")
-        engine.add_event_handler(Events.STARTED, ext_mod.time_logger, 99)
-        engine.add_event_handler(Events.COMPLETED, ext_mod.time_logger, 101)
-        engine.add_event_handler(Events.COMPLETED, ext_mod.ext_write_info, 100, msg="TrailBot completed.")
-        engine.add_event_handler(Events.ITERATION_COMPLETED, ext_mod.loss_reporter, 100)
+        if not clean:
+            engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 100, msg="Epoch started")
+            engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 105, msg=("====" * 20))
+            engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.current_epoch_logger, 99)
+            engine.add_event_handler(Events.STARTED, ext_mod.ext_write_info, 100, msg="TrailBot started")
+            engine.add_event_handler(Events.STARTED, ext_mod.time_logger, 99)
+            engine.add_event_handler(Events.COMPLETED, ext_mod.time_logger, 101)
+            engine.add_event_handler(Events.COMPLETED, ext_mod.ext_write_info, 100, msg="TrailBot completed.")
+            engine.add_event_handler(Events.ITERATION_COMPLETED, ext_mod.loss_reporter, 100)
         return engine
 
     @property
@@ -141,20 +143,7 @@ class TrialBot:
             self.logger.setLevel(logging.INFO)
 
         hparams = Registry.get_hparamset(args.hparamset)
-        train_set, dev_set, test_set = Registry.get_dataset(args.dataset)
-        translator = Registry.get_translator(args.translator)
         self.hparams = hparams
-        self.train_set = train_set
-        self.dev_set = dev_set
-        self.test_set = test_set
-        self.translator = translator
-
-        vocab = self._init_vocab(train_set, translator)
-        self.vocab = vocab
-        translator.index_with_vocab(vocab)
-
-        self.models = self._init_models(hparams, vocab)
-
         savepath = args.snapshot_dir if args.snapshot_dir else (os.path.join(
             hparams.SNAPSHOT_PATH,
             args.dataset,
@@ -162,6 +151,42 @@ class TrialBot:
             datetime.now().strftime('%Y%m%d-%H%M%S') + ('-' + args.memo if args.memo else '')
         ))
         self.savepath = savepath
+
+        self._init_dataset()
+        self._init_translator()
+
+        self.vocab = self._init_vocab(self.train_set, self.translator)
+
+        self.translator.index_with_vocab(self.vocab)
+        self.models = self._init_models(hparams, self.vocab)
+
+    def _init_dataset(self):
+        args = self.args
+        self.datasets = Registry.get_dataset(args.dataset)
+        return self.datasets
+
+    @property
+    def train_set(self):
+        return self._get_classical_dataset_split(0)
+
+    @property
+    def dev_set(self):
+        return self._get_classical_dataset_split(1)
+
+    @property
+    def test_set(self):
+        return self._get_classical_dataset_split(2)
+
+    def _get_classical_dataset_split(self, i):
+        assert len(self.datasets) >= 3 and all(isinstance(x, Dataset) for x in self.datasets[:3])
+        return self.datasets[i]
+
+    def _init_translator(self):
+        args, p = self.args, self.hparams
+        translator_kwargs = getattr(p, 'TRANSLATOR_KWARGS', dict())
+        translator = Registry.get_translator(args.translator, **translator_kwargs)
+        self.translator = translator
+        return translator
 
     def _init_vocab(self,
                     dataset: Dataset,

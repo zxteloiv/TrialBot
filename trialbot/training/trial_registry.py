@@ -38,8 +38,8 @@ class Registry:
         return decorator
 
     @staticmethod
-    def get_translator(name) -> Translator:
-        return Registry._translators[name]()
+    def get_translator(name, **kwargs) -> Translator:
+        return Registry._translators[name](**kwargs)
 
     @staticmethod
     def hparamset(name=None):
