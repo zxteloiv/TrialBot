@@ -2,7 +2,8 @@ from typing import Optional, List, Dict, Union, Any
 from trialbot.utils.move_to_device import move_to_device
 import torch.nn
 from .trial_bot import TrialBot
-from trialbot.data import Iterator, RandomIterator
+from trialbot.data.iterators import RandomIterator
+from trialbot.data.iterator import Iterator
 
 class Updater:
     def __init__(self,

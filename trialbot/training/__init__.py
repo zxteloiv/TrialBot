@@ -1,5 +1,5 @@
-from trialbot.training.trial_registry import Registry
-from trialbot.training.trial_bot import TrialBot, Events, State
-from trialbot.training.updater import Updater
+from .trial_registry import Registry
+from .trial_bot import TrialBot, Events, State
+from .updater import Updater
 
-import trialbot.training.extensions as bot_extensions
+from . import extensions as bot_extensions

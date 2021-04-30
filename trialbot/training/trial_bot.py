@@ -14,7 +14,7 @@ from trialbot.data.translator import Translator
 from .opt_parser import get_trial_bot_common_opt_parser
 from .trial_registry import Registry
 from .event_engine import Engine
-import trialbot.training.extensions as ext_mod
+from . import extensions as ext_mod
 import logging
 logging.basicConfig()
 
