@@ -9,8 +9,3 @@ from trialbot.data.datasets.index_dataset import IndexDataset
 from trialbot.data.datasets.consecutive_lines_dataset import ConsecutiveLinesDataset
 from trialbot.data.datasets.tsv_dataset import TSVDataset
 
-from trialbot.data.iterator import Iterator
-from trialbot.data.iterators.random_iterator import RandomIterator
-
-from trialbot.data.translator import Translator
-

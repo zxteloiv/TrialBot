@@ -24,7 +24,13 @@
 #
 
 import six
-import numpy
+try:
+    import numpy
+    is_ndarray = lambda x: isinstance(x, numpy.ndarray)
+except ImportError:
+    import logging
+    logging.warning('numpy not installed; dataset indexing with a numpy ndarray will be unavailable')
+    is_ndarray = lambda x: False
 
 class Dataset:
 
@@ -63,7 +69,7 @@ class Dataset:
             current, stop, step = index.indices(len(self))
             return [self.get_example(i) for i in
                     six.moves.range(current, stop, step)]
-        elif isinstance(index, list) or isinstance(index, numpy.ndarray):
+        elif isinstance(index, list) or is_ndarray(index):
             return [self.get_example(i) for i in index]
         else:
             return self.get_example(index)
