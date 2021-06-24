@@ -1,17 +1,9 @@
-from __future__ import division
-from typing import List, Mapping
-
 import numpy
-import torch
-
 from ..iterator import Iterator
-from ..translator import Translator
-
 import logging
 
 
 class RandomIterator(Iterator):
-
     """Dataset iterator that serially reads the examples.
 
     This is a simple implementation of :class:`~chainer.dataset.Iterator`
@@ -35,99 +27,73 @@ class RandomIterator(Iterator):
             the behavior is the same as the case with ``shuffle=True``.
     """
 
-    def __init__(self, dataset, batch_size, translator,
-                 repeat=True, shuffle=True):
+    def __init__(self, dataset_len: int, batch_size: int, repeat: bool = True, shuffle: bool = True):
         super(RandomIterator, self).__init__()
-        self.dataset = dataset
+        self.dataset_len = dataset_len
         self.batch_size = batch_size
-        self.translator: Translator = translator
-        self._repeat = repeat
-        self._shuffle = shuffle
-        self._order = None
+        self.repeat: bool = repeat
+        self.shuffle: bool = shuffle
+        self._order = None if not self.shuffle else numpy.random.permutation(numpy.arange(self.dataset_len))
+        self.current_position = 0
         self.logger = logging.getLogger(__name__)
-
-        self.reset()
+        self.epoch = 0
+        self.is_end_of_epoch = False
 
     def __next__(self):
-        if self._epoch_size == 0:
+        if self._epoch_size == 0 or self.batch_size == 0:
             self.logger.warning("Given dataset is empty. Nothing to yield but only raising StopIteration")
             raise StopIteration
 
-        if not self._repeat and self.epoch > 0:
+        if not self.repeat and self.epoch > 0:
             raise StopIteration
-
-        self._previous_epoch_detail = self.epoch_detail
 
         i = self.current_position
         i_end = i + self.batch_size
         N = self._epoch_size
 
         if self._order is None:
-            batch = self.dataset[i:i_end]
+            batch = list(range(i, i_end))
         else:
-            batch = [self.dataset[index] for index in self._order[i:i_end]]
+            batch = [index for index in self._order[i:i_end]]
 
         if i_end >= N:
-            if self._repeat:
+            if self.repeat:
                 rest = i_end - N
                 if self._order is not None:
-                    new_order = numpy.random.permutation(numpy.arange(len(self.dataset)))
+                    new_order = numpy.random.permutation(numpy.arange(self.dataset_len))
                     self._order = new_order
 
                 if rest > 0:
                     if self._order is None:
-                        batch.extend(self.dataset[:rest])
+                        batch.extend(list(range(rest)))
                     else:
-                        batch.extend([self.dataset[index]
-                                      for index in self._order[:rest]])
+                        batch.extend([index for index in self._order[:rest]])
                 self.current_position = rest
             else:
                 self.current_position = 0
 
             self.epoch += 1
-            self.is_new_epoch = True
+            self.is_end_of_epoch = True
         else:
-            self.is_new_epoch = False
+            self.is_end_of_epoch = False
             self.current_position = i_end
 
-        return self.batch_to_tensors(batch)
+        return batch
 
     next = __next__
-
-    def batch_to_tensors(self, batch: List) -> Mapping[str, torch.Tensor]:
-        tensor_list = [self.translator.to_tensor(example) for example in batch]
-        tensor = self.translator.batch_tensor(tensor_list)
-        return tensor
-
-    @property
-    def epoch_detail(self):
-        return self.epoch + self.current_position / self._epoch_size
-
-    @property
-    def previous_epoch_detail(self):
-        if self._previous_epoch_detail < 0:
-            return None
-        return self._previous_epoch_detail
 
     def reset(self, skip=0):
         self.current_position = skip
         self.epoch = 0
-        self.is_new_epoch = False
+        self.is_end_of_epoch = False
 
-        # use -1 instead of None internally.
-        self._previous_epoch_detail = -1.
-
-        if self._shuffle:
-            self._order = numpy.random.permutation(numpy.arange(len(self.dataset)))
+        if self.shuffle:
+            self._order = numpy.random.permutation(numpy.arange(self.dataset_len))
 
     @property
     def _epoch_size(self):
         if self._order is None:
-            return len(self.dataset)
+            return self.dataset_len
         else:
             return len(self._order)
-
-    @property
-    def repeat(self):
-        return self._repeat
 

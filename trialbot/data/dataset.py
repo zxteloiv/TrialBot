@@ -96,3 +96,8 @@ class Dataset:
 
         """
         raise NotImplementedError
+
+class CompositionalDataset(Dataset):
+    def __init__(self, dataset: Dataset):
+        self.dataset = dataset
+
