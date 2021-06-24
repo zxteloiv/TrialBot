@@ -6,7 +6,7 @@
 *temp
 *.log
 *.dat
-vocab.pkl
+*.pkl
 .idea
 env
 log.*
