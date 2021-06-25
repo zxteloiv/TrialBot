@@ -242,8 +242,8 @@ class TrialBot:
         if self.args.test:
             # testing procedure
             # 1. init updater; 2. run the testing engine
-            from .updater import TestingUpdater
             if self.updater is None:
+                from .updaters.testing_updater import TestingUpdater
                 self.updater = TestingUpdater.from_bot(self)
             self._testing_engine_loop(self.updater)
 
@@ -258,8 +258,8 @@ class TrialBot:
                 os.makedirs(vocab_path, mode=0o755)
                 self.vocab.save_to_files(vocab_path)
 
-            from .updater import TrainingUpdater
             if self.updater is None:
+                from .updaters.training_updater import TrainingUpdater
                 self.updater = TrainingUpdater.from_bot(self)
             self._training_engine_loop(self.updater, hparams.TRAINING_LIMIT)
 
