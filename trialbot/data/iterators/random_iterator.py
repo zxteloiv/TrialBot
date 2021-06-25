@@ -52,7 +52,7 @@ class RandomIterator(Iterator):
         N = self._epoch_size
 
         if self._order is None:
-            batch = list(range(i, i_end))
+            batch = list(range(self.dataset_len))[i:i_end]
         else:
             batch = [index for index in self._order[i:i_end]]
 
