@@ -1,5 +1,9 @@
 from trialbot.data.ns_vocabulary import NSVocabulary, PADDING_TOKEN, START_SYMBOL, END_SYMBOL, DEFAULT_OOV_TOKEN
 
+# Since translators and fields depend on torch, they'd better not be imported here
+# to make the data namespace clean and support pure python use.
+#
+
 from trialbot.data.dataset import Dataset, CompositionalDataset
 from trialbot.data.datasets.file_dataset import FileDataset
 from trialbot.data.datasets.tabular_dataset import TabSepFileDataset
