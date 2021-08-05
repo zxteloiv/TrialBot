@@ -15,9 +15,14 @@ class Translator(_TranslationBase):
 
 
 class FieldAwareTranslator(Translator):
-    def __init__(self, field_list: List[Field]):
+    def __init__(self, field_list: List[Field], vocab_fields: Optional[List[Field]] = None):
+        """ Initialize the translator with some fields.
+        field_list: default fields
+        vocab_fields: only used to build the vocabulary indices, default to field_list if not applicable
+        """
         super().__init__()
         self.fields = field_list
+        self.vocab_fields = vocab_fields or field_list
 
     def index_with_vocab(self, vocab: NSVocabulary):
         super().index_with_vocab(vocab)
@@ -25,7 +30,7 @@ class FieldAwareTranslator(Translator):
             field.index_with_vocab(vocab)
 
     def generate_namespace_tokens(self, example) -> Generator[Tuple[str, str], None, None]:
-        for field in self.fields:
+        for field in self.vocab_fields:
             yield from field.generate_namespace_tokens(example)
 
     def to_tensor(self, example) -> Mapping[str, NullableTensor]:
