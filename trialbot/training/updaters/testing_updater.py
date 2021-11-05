@@ -1,4 +1,5 @@
 from trialbot.utils.move_to_device import move_to_device
+import logging
 from ..trial_bot import TrialBot
 from trialbot.data.iterators import RandomIterator
 from ..updater import Updater
@@ -16,7 +17,13 @@ class TestingUpdater(Updater):
 
         indices = next(iterator)
         tensor_list = [self.translator.to_tensor(self.dataset[index]) for index in indices]
-        batch = self.translator.batch_tensor(tensor_list)
+        try:
+            batch = self.translator.batch_tensor(tensor_list)
+        except Exception as e:
+            logging.getLogger(self.__class__.__name__).warning(
+                f'skipping the preprocessing of the batch which raises an exception ... {str(e)}'
+            )
+            return None
 
         if iterator.is_end_of_epoch:
             self.stop_epoch()

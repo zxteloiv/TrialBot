@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List, Dict, Union, Any, Sequence
 from trialbot.utils.move_to_device import move_to_device
 import torch.nn
@@ -22,7 +23,13 @@ class TrainingUpdater(Updater):
         optim.zero_grad()
         indices: Sequence[int] = next(iterator)
         tensor_list = [self.translator.to_tensor(self.dataset[index]) for index in indices]
-        batch = self.translator.batch_tensor(tensor_list)
+        try:
+            batch = self.translator.batch_tensor(tensor_list)
+        except Exception as e:
+            logging.getLogger(self.__class__.__name__).warning(
+                f'skipping the preprocessing of the batch which raises an exception ... {str(e)}'
+            )
+            return None
 
         if device >= 0:
             batch = move_to_device(batch, device)
