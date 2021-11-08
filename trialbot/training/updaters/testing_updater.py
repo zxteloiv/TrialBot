@@ -34,12 +34,10 @@ class TestingUpdater(Updater):
 
     @classmethod
     def from_bot(cls, bot: TrialBot) -> 'TestingUpdater':
-        self = bot
-        args, model = self.args, self.model
+        args, model, hparams = bot.args, bot.model, bot.hparams
         device = args.device
-
-        hparams, model = self.hparams, self.model
-        iterator = RandomIterator(len(self.test_set), hparams.batch_sz, shuffle=False, repeat=False)
-        updater = cls(self.test_set, bot.translator, model, iterator, None, device)
+        dataset = bot.dev_set if args.dev else bot.test_set
+        iterator = RandomIterator(len(dataset), hparams.batch_sz, shuffle=False, repeat=False)
+        updater = cls(dataset, bot.translator, model, iterator, None, device)
         return updater
 

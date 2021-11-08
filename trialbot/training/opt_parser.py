@@ -12,6 +12,7 @@ def get_trial_bot_common_opt_parser() -> argparse.ArgumentParser:
     parser.add_argument("--debug", action="store_true", help="print the debugging log")
     parser.add_argument('--memo', type=str, default="", help="used to remember some runtime configurations")
     parser.add_argument('--test', action="store_true", help='use testing mode')
+    parser.add_argument('--dev', action="store_true", help='use testing mode on dev data')
     parser.add_argument('--hparamset', '-p', help="choose one of the available hyper-parameters",
                         choices=Registry._hparamsets.keys())
     parser.add_argument('--snapshot-dir', help="snapshot dir if continues")

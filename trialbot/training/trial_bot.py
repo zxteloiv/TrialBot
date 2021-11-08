@@ -236,8 +236,9 @@ class TrialBot:
             models = [model.cuda(args.device) for model in models]
         return models
 
-    def run(self):
-        args, hparams = self.args, self.hparams
+    def run(self, training_epoch: int = 0):
+        if training_epoch == 0:
+            training_epoch = self.hparams.TRAINING_LIMIT
 
         if self.args.test:
             # testing procedure
@@ -261,7 +262,7 @@ class TrialBot:
             if self.updater is None:
                 from .updaters.training_updater import TrainingUpdater
                 self.updater = TrainingUpdater.from_bot(self)
-            self._training_engine_loop(self.updater, hparams.TRAINING_LIMIT)
+            self._training_engine_loop(self.updater, training_epoch)
 
     def _training_engine_loop(self, updater, max_epoch):
         engine = self._engine
