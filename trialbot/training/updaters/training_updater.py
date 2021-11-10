@@ -7,11 +7,12 @@ from trialbot.data.iterators import RandomIterator
 from ..updater import Updater
 
 class TrainingUpdater(Updater):
-    def __init__(self, dataset, translator, models, iterators, optims, device=-1, dry_run: bool = False):
+    def __init__(self, dataset, translator, models, iterators, optims, device=-1, dry_run: bool = False, grad_clip_value: float = 0.):
         super().__init__(models, iterators, optims, device)
         self._dry_run = dry_run
         self.dataset = dataset
         self.translator = translator
+        self.grad_clip_value = grad_clip_value
 
     def update_epoch(self):
         model, optim, iterator = self._models[0], self._optims[0], self._iterators[0]
@@ -38,6 +39,9 @@ class TrainingUpdater(Updater):
         if not self._dry_run:
             loss = output['loss']
             loss.backward()
+
+            if self.grad_clip_value > 0:
+                torch.nn.utils.clip_grad_value_(model.parameters(), self.grad_clip_value)
             optim.step()
         return output
 
@@ -65,7 +69,8 @@ class TrainingUpdater(Updater):
         if args.debug and args.skip:
             iterator.reset(args.skip)
 
-        updater = cls(bot.train_set, bot.translator, model, iterator, optim, device, dry_run)
+        updater = cls(bot.train_set, bot.translator, model, iterator, optim, device, dry_run,
+                      grad_clip_value=p.GRAD_CLIPPING)
         return updater
 
 

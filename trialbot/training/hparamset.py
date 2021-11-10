@@ -32,7 +32,7 @@ class HyperParamSet:
         hparams.ADAM_EPS = 1e-9
 
         hparams.WEIGHT_DECAY = 0.
-        hparams.GRAD_CLIPPING = 5
+        hparams.GRAD_CLIPPING = 2
 
         hparams.SGD_LR = 1e-2
         hparams.DATA_PATH = os.path.join(ROOT, 'data')
