@@ -126,6 +126,11 @@ class TrialBot:
         parser.add_argument('--dry-run', action="store_true")
         parser.add_argument('--skip', type=int, help='skip NUM examples for the first iteration, intended for debug use.')
         parser.add_argument('--vocab-dump', help="the file path to save and load the vocab obj")
+
+        parser.add_argument('--batch-size', type=int, default=0,
+                            help='overwrite the hparamset.batch_sz if specified at CLI')
+        parser.add_argument('--epoch', type=int, default=0,
+                            help='overwrite the hparamset.TRAINING_LIMIT if specified at CLI')
         return parser
 
     def _init_components(self):
@@ -143,6 +148,11 @@ class TrialBot:
             self.logger.setLevel(logging.INFO)
 
         hparams = Registry.get_hparamset(args.hparamset)
+        if args.batch_size > 0:
+            hparams.batch_sz = args.batch_size
+        if args.epoch > 0:
+            hparams.TRAINING_LIMIT = args.epoch
+
         self.hparams = hparams
         savepath = args.snapshot_dir if args.snapshot_dir else (os.path.join(
             hparams.SNAPSHOT_PATH,
