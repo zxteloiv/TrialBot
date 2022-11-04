@@ -105,6 +105,8 @@ class TrialBot:
         engine.register_events(*Events)
         # events with greater priorities will get processed earlier.
         if not clean:
+            # by default not to add expensive extensions, such as dumping models of each epoch,
+            # evaluations at the end of each epoch, collecting garbage.
             engine.add_event_handler(Events.STARTED, exts.print_hyperparameters, 90)
             engine.add_event_handler(Events.STARTED, exts.print_snaptshot_path, 90)
             engine.add_event_handler(Events.STARTED, exts.print_models, 100)

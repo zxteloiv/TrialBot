@@ -55,6 +55,10 @@ def print_snaptshot_path(bot):
     bot.logger.info("Snapshot Dir: " + bot.savepath)
 
 
+def print_models(bot: TrialBot):
+    bot.logger.info("Model Specs:\n" + str(bot.models))
+
+
 def collect_garbage(bot: TrialBot):
     import gc
     for optim in bot.updater._optims:
