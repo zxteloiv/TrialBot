@@ -14,7 +14,7 @@ from trialbot.data.translator import Translator
 from .opt_parser import get_trial_bot_common_opt_parser
 from .trial_registry import Registry
 from .event_engine import Engine
-from . import extensions as ext_mod
+from . import extensions as exts
 import logging
 logging.basicConfig()
 
@@ -105,14 +105,19 @@ class TrialBot:
         engine.register_events(*Events)
         # events with greater priorities will get processed earlier.
         if not clean:
-            engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 100, msg="Epoch started")
-            engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.ext_write_info, 105, msg=("====" * 20))
-            engine.add_event_handler(Events.EPOCH_STARTED, ext_mod.current_epoch_logger, 99)
-            engine.add_event_handler(Events.STARTED, ext_mod.ext_write_info, 100, msg="TrailBot started")
-            engine.add_event_handler(Events.STARTED, ext_mod.time_logger, 99)
-            engine.add_event_handler(Events.COMPLETED, ext_mod.time_logger, 101)
-            engine.add_event_handler(Events.COMPLETED, ext_mod.ext_write_info, 100, msg="TrailBot completed.")
-            engine.add_event_handler(Events.ITERATION_COMPLETED, ext_mod.loss_reporter, 100)
+            engine.add_event_handler(Events.STARTED, exts.print_hyperparameters, 90)
+            engine.add_event_handler(Events.STARTED, exts.print_snaptshot_path, 90)
+            engine.add_event_handler(Events.STARTED, exts.print_models, 100)
+            engine.add_event_handler(Events.STARTED, exts.ext_write_info, 105, msg=("====" * 20))
+            engine.add_event_handler(Events.EPOCH_STARTED, exts.ext_write_info, 105, msg=("----" * 20))
+            engine.add_event_handler(Events.EPOCH_STARTED, exts.ext_write_info, 100, msg="Epoch started")
+            engine.add_event_handler(Events.EPOCH_STARTED, exts.current_epoch_logger, 99)
+            engine.add_event_handler(Events.STARTED, exts.ext_write_info, 100, msg="TrailBot started")
+            engine.add_event_handler(Events.STARTED, exts.time_logger, 99)
+            engine.add_event_handler(Events.COMPLETED, exts.time_logger, 101)
+            engine.add_event_handler(Events.COMPLETED, exts.ext_write_info, 100, msg="TrailBot completed.")
+            engine.add_event_handler(Events.ITERATION_COMPLETED, exts.loss_reporter, 100)
+            engine.add_event_handler(Events.ITERATION_COMPLETED, exts.end_with_nan_loss, 100)
         return engine
 
     @property
