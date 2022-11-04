@@ -2,7 +2,6 @@ import datetime
 import torch
 import math
 import os.path
-from trialbot.training.trial_bot import TrialBot
 
 
 def ext_write_info(bot, msg):
@@ -55,11 +54,11 @@ def print_snaptshot_path(bot):
     bot.logger.info("Snapshot Dir: " + bot.savepath)
 
 
-def print_models(bot: TrialBot):
+def print_models(bot):
     bot.logger.info("Model Specs:\n" + str(bot.models))
 
 
-def collect_garbage(bot: TrialBot):
+def collect_garbage(bot):
     import gc
     for optim in bot.updater._optims:
         optim.zero_grad()
@@ -72,7 +71,7 @@ def collect_garbage(bot: TrialBot):
         torch.cuda.empty_cache()
 
 
-def end_with_nan_loss(bot: TrialBot):
+def end_with_nan_loss(bot):
     import numpy as np
     output = getattr(bot.state, 'output', None)
     if output is None:
