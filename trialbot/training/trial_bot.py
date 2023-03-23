@@ -246,8 +246,15 @@ class TrialBot:
             models = [models]
 
         if args.models:
+            def int_to_device(device):
+                if isinstance(device, torch.device):
+                    return device
+                if device < 0:
+                    return torch.device("cpu")
+                return torch.device(device)
+
             for model, model_path in zip(models, args.models):
-                model.load_state_dict(torch.load(model_path))
+                model.load_state_dict(torch.load(model_path, map_location=int_to_device(args.device)))
 
         if args.device >= 0:
             models = [model.cuda(args.device) for model in models]
