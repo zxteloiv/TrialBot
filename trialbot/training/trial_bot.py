@@ -159,15 +159,11 @@ class TrialBot:
             hparams.batch_sz = args.batch_size
         if args.epoch > 0:
             hparams.TRAINING_LIMIT = args.epoch
+        if args.translator:
+            hparams.TRANSLATOR = args.translator
 
         self.hparams = hparams
-        savepath = args.snapshot_dir if args.snapshot_dir else (os.path.join(
-            hparams.SNAPSHOT_PATH,
-            args.dataset,
-            self.name,
-            datetime.now().strftime('%Y%m%d-%H%M%S') + ('-' + args.memo if args.memo else '')
-        ))
-        self.savepath = savepath
+        self.savepath = args.snapshot_dir if args.snapshot_dir else self._default_savepath()
 
         self._init_dataset()
         self._init_translator()
@@ -181,6 +177,15 @@ class TrialBot:
         args = self.args
         self.datasets = Registry.get_dataset(args.dataset)
         return self.datasets
+
+    def _default_savepath(self):
+        args = self.args
+        return os.path.join(
+            self.hparams.SNAPSHOT_PATH,
+            args.dataset,
+            self.name,
+            datetime.now().strftime('%Y%m%d-%H%M%S') + ('-' + args.memo if args.memo else '')
+        )
 
     @property
     def train_set(self):
@@ -199,9 +204,9 @@ class TrialBot:
         return self.datasets[i]
 
     def _init_translator(self):
-        args, p = self.args, self.hparams
+        p = self.hparams
         translator_kwargs = getattr(p, 'TRANSLATOR_KWARGS', dict())
-        translator = Registry.get_translator(args.translator, **translator_kwargs)
+        translator = Registry.get_translator(p.TRANSLATOR, **translator_kwargs)
         self.translator = translator
         return translator
 
