@@ -76,7 +76,9 @@ def end_with_nan_loss(bot):
     output = getattr(bot.state, 'output', None)
     if output is None:
         return
-    loss = output["loss"]
+    loss = output.get('loss', None)
+    if loss is None:
+        return
 
     def _isnan(x):
         if isinstance(x, torch.Tensor):
