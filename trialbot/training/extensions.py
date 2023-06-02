@@ -50,8 +50,11 @@ def print_hyperparameters(bot):
     bot.logger.info(f"Hyperparamset Used: {bot.args.hparamset}\n{str(bot.hparams)}")
 
 
-def print_snaptshot_path(bot):
-    bot.logger.info("Snapshot Dir: " + bot.savepath)
+def print_snaptshot_path(bot, use_absolute_path: bool = True):
+    path = bot.savepath
+    if use_absolute_path:
+        path = os.path.abspath(path)
+    bot.logger.info("Snapshot Dir: " + path)
 
 
 def print_models(bot):
