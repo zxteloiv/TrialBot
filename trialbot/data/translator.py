@@ -15,14 +15,16 @@ class Translator(_TranslationBase):
 
 
 class FieldAwareTranslator(Translator):
-    def __init__(self, field_list: List[Field], vocab_fields: Optional[List[Field]] = None):
+    def __init__(self, field_list: List[Field], vocab_fields: Optional[List[Field]] = None, filter_none: bool = True):
         """ Initialize the translator with some fields.
         field_list: default fields
         vocab_fields: only used to build the vocabulary indices, default to field_list if not applicable
+        filter_none: remove the example with a None value for any field, default is True.
         """
         super().__init__()
         self.fields = field_list
         self.vocab_fields = vocab_fields or field_list
+        self.filter_none = filter_none
 
     def index_with_vocab(self, vocab: NSVocabulary):
         super().index_with_vocab(vocab)
@@ -40,7 +42,8 @@ class FieldAwareTranslator(Translator):
         return instance_fields
 
     def batch_tensor(self, tensors: List[Mapping[str, NullableTensor]]) -> Mapping[str, torch.Tensor]:
-        tensors = list(filter(lambda x: all(v is not None for v in x.values()), tensors))
+        if self.filter_none:
+            tensors = list(filter(lambda x: all(v is not None for v in x.values()), tensors))
         batch_dict = self.list_of_dict_to_dict_of_list(tensors)
         output = {}
         for field in self.fields:
