@@ -305,12 +305,11 @@ class TrialBot:
                 engine.fire_event(Events.ITERATION_STARTED, bot=self)
                 try:
                     self.state.output = next(updater)
+                    engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
                 except StopIteration:
                     self.state.iteration -= 1
                     self.state.output = None
                     break
-                finally:
-                    engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
 
             engine.fire_event(Events.EPOCH_COMPLETED, bot=self)
         engine.fire_event(Events.COMPLETED, bot=self)
@@ -326,12 +325,11 @@ class TrialBot:
                 engine.fire_event(Events.ITERATION_STARTED, bot=self)
                 try:
                     self.state.output = next(updater)
+                    engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
                 except StopIteration:
                     self.state.iteration -= 1
                     self.state.output = None
                     break
-                finally:
-                    engine.fire_event(Events.ITERATION_COMPLETED, bot=self)
 
             engine.fire_event(Events.EPOCH_COMPLETED, bot=self)
             engine.fire_event(Events.COMPLETED, bot=self)
