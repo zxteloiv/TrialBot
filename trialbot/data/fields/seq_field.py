@@ -1,23 +1,26 @@
-from typing import List, Mapping, Generator, Tuple, Optional, Any, Literal
-from ..field import Field, NullableTensor
+from typing import Any
+from ..field import Field, T
+from collections.abc import Iterator
 import torch
-from trialbot.data import START_SYMBOL, END_SYMBOL, PADDING_TOKEN, NSVocabulary
+from trialbot.data import START_SYMBOL, END_SYMBOL
 from itertools import product
 from torch.nn.utils.rnn import pad_sequence
+
 
 class SeqField(Field):
     def get_sent(self, example):
         return example.get(self.source_key)
 
-    def generate_namespace_tokens(self, example) -> Generator[Tuple[str, str], None, None]:
+    def generate_namespace_tokens(self, example: Any) -> Iterator[tuple[str, str]]:
         if self.add_start_end_toks:
             yield from product([self.ns], [START_SYMBOL, END_SYMBOL])
 
         seq_raw = self.get_sent(example)
         if seq_raw is not None:
-            yield from product([self.ns], (x.lower() if self.lower_case else x for x in self.split(seq_raw)))
+            yield from product([self.ns], (x.lower() if self.lower_case else x
+                                           for x in self.split(seq_raw)))
 
-    def to_tensor(self, example) -> Mapping[str, NullableTensor]:
+    def to_input(self, example) -> dict[str, T | None]:
         seq_raw = self.get_sent(example)
         if seq_raw is None:
             return {self.renamed_key: torch.tensor([self.padding])}
@@ -39,10 +42,8 @@ class SeqField(Field):
         seq_tensor = torch.tensor(seq_toks)
         return {self.renamed_key: seq_tensor}
 
-    def batch_tensor_by_key(self,
-                            tensors_by_keys: Mapping[str, List[NullableTensor]]
-                            ) -> Mapping[str, torch.Tensor]:
-        tensor_list = tensors_by_keys.get(self.renamed_key)
+    def build_batch_by_key(self, input_dict: dict[str, list[T]]) -> dict[str, torch.Tensor | list[T]]:
+        tensor_list = input_dict.get(self.renamed_key)
         if tensor_list is None or len(tensor_list) == 0:
             raise KeyError(f'Empty field key {self.renamed_key} confronted. Failed to build the instance tensors')
 

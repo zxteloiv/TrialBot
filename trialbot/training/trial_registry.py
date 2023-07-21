@@ -1,8 +1,9 @@
-from typing import Callable, Tuple
+from collections.abc import Callable
 
 from trialbot.data.dataset import Dataset
 from trialbot.data.translator import Translator
 from .hparamset import HyperParamSet
+
 
 class Registry:
     """
@@ -15,7 +16,7 @@ class Registry:
 
     @staticmethod
     def dataset(name=None):
-        def decorator(dataset_fn: Callable[[], Tuple[Dataset, Dataset, Dataset]]):
+        def decorator(dataset_fn: Callable[[], tuple[Dataset, Dataset, Dataset]]):
             nonlocal name
             if name is None:
                 name = dataset_fn.__name__
@@ -24,7 +25,7 @@ class Registry:
         return decorator
 
     @staticmethod
-    def get_dataset(name) -> Tuple[Dataset, Dataset, Dataset]:
+    def get_dataset(name) -> tuple[Dataset, Dataset, Dataset]:
         return Registry._datasets[name]()
 
     @staticmethod

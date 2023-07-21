@@ -1,19 +1,29 @@
-from typing import Optional, List, Dict, Union, Any
-import torch.nn
-from .trial_bot import TrialBot
-from trialbot.data.iterator import Iterator
 
 class Updater:
-    def __init__(self,
-                 models: Union[List[torch.nn.Module], torch.nn.Module],
-                 iterators: Union[List[Iterator], Iterator],
-                 optims,
-                 device: int = -1):
-        self._models = models if isinstance(models, list) else [models]
-        self._device = device
-        self._iterators: List[Iterator] = iterators if isinstance(iterators, list) else [iterators]
-        self._optims = optims if isinstance(optims, list) else [optims]
+    """
+    The most important function of the updater is designed to handle the life term of iterators.
 
+    A TrialBot is obliged to control the component objects,
+    including runtime args, hyper-parameters, models, datasets, translators, vocab, and so on.
+    It is a easy and straightforward bundle to use in a trial or a few trials.
+
+    However, the iterators are short-term compared with the others.
+    They are only expected to work with the main training loops.
+
+    To extract the complexity of iterators with other components,
+    the updater (inspired by the Chainer, one of the pioneer deep learning frameworks)
+    is added as an abstraction layer to manage the iterators during training loops.
+
+    That's why the training iteration is not considered as a function
+    that can be registered to the TrialBot event engine,
+    but is implemented by the update_epoch function within the updater class.
+
+    Furthermore, an iterator will define the randomness or other criterion
+    to draw samples from the dataset, which however again depends on the end usage.
+    Therefore it had better to initialize an iterator within the subclass,
+    not in the base updater.
+    """
+    def __init__(self):
         self._epoch_ended = False
 
     def start_epoch(self):
@@ -21,7 +31,7 @@ class Updater:
 
     def __call__(self):
         """
-        If called by __call__, Updater will returns a iterator.
+        If called by __call__, Updater will returns an iterator.
         Therefore supporting the following paradigm for training or testing loops.
 
         ```python
@@ -57,8 +67,3 @@ class Updater:
 
     def stop_epoch(self):
         self._epoch_ended = True
-
-    @classmethod
-    def from_bot(cls, bot: TrialBot) -> 'Updater':
-        raise NotImplementedError
-

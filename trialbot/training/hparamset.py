@@ -1,3 +1,5 @@
+import os.path
+
 
 class HyperParamSet:
     def __str__(self):
@@ -14,30 +16,25 @@ class HyperParamSet:
 
     @staticmethod
     def common_settings(root_path=None):
-        import os.path
-        hparams = HyperParamSet()
+        p = HyperParamSet()
 
-        hparams.DEVICE = -1
-        ROOT = '.' if root_path is None else root_path
-        hparams.ROOT = ROOT
-        hparams.SNAPSHOT_PATH = os.path.join(ROOT, 'snapshots')
+        p.ROOT = '.' if root_path is None else root_path
+        p.SNAPSHOT_PATH = os.path.join(p.ROOT, 'snapshots')
+        p.DATA_PATH = os.path.join(p.ROOT, 'data')
 
-        hparams.LOG_REPORT_INTERVAL = (1, 'iteration')
-        hparams.TRAINING_LIMIT = 500  # in num of epochs
-        hparams.SAVE_INTERVAL = (100, 'iteration')
-        hparams.batch_sz = 128
+        p.TRAINING_LIMIT = 500  # in num of epochs
+        p.batch_sz = 128
 
-        hparams.ADAM_LR = 1e-3
-        hparams.ADAM_BETAS = (.9, .98)
-        hparams.ADAM_EPS = 1e-9
+        p.OPTIM = 'adam'
+        p.OPTIM_KWARGS = dict()
+        p.ADAM_LR = 1e-3
+        p.ADAM_BETAS = (.9, .98)
+        p.ADAM_EPS = 1e-9
+        p.WEIGHT_DECAY = 0.
+        p.GRAD_CLIPPING = 2
+        p.SGD_LR = 1e-2
 
-        hparams.WEIGHT_DECAY = 0.
-        hparams.GRAD_CLIPPING = 2
+        p.NS_VOCAB_KWARGS = dict()
 
-        hparams.SGD_LR = 1e-2
-        hparams.DATA_PATH = os.path.join(ROOT, 'data')
-
-        hparams.NS_VOCAB_KWARGS = dict()
-
-        return hparams
+        return p
 

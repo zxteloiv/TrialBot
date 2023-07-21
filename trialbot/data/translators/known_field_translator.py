@@ -1,5 +1,5 @@
-from typing import Mapping, Set, Optional, List, Any
-from ..translator import FieldAwareTranslator, NullableTensor
+from ..translator import FieldAwareTranslator, T
+import torch
 
 
 class _DictKeyRefWrapper(dict):
@@ -25,29 +25,29 @@ class KnownFieldTranslator(FieldAwareTranslator):
     """
     def __init__(self, accessed_field_set=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._accessed_field_set: Optional[Set] = accessed_field_set
+        self._accessed_field_set: set | None = accessed_field_set
 
-    def to_tensor(self, example) -> Mapping[str, NullableTensor]:
+    def to_input(self, example) -> dict[str, T | None]:
         output = {}
         if self._accessed_field_set is None:
             example = _DictKeyRefWrapper(example)
-            output.update(super().to_tensor(example))
+            output.update(super().to_input(example))
             self._accessed_field_set = set(example.ref_set)
         else:
-            output.update(super().to_tensor(example))
+            output.update(super().to_input(example))
 
         for field in filter(lambda k: k not in self._accessed_field_set, example.keys()):
             output[field] = example[field]
 
         return output
 
-    def batch_tensor(self, tensors: List[Mapping[str, NullableTensor]]) -> Mapping[str, Any]:
+    def build_batch(self, input_list: list[dict[str, T | None]]) -> dict[str, torch.Tensor | list[T]]:
         processed_fields = self._accessed_field_set or set()
-        tensors = list(filter(lambda x: all(v is not None for v in x.values()), tensors))
+        tensors = list(filter(lambda x: all(v is not None for v in x.values()), input_list))
         batch_dict = self.list_of_dict_to_dict_of_list(tensors)
         output = {}
         for field in self.fields:
-            output.update(field.batch_tensor_by_key(batch_dict))
+            output.update(field.build_batch_by_key(batch_dict))
         for k, v in batch_dict.items():
             if k not in processed_fields and k not in output.keys():
                 output[k] = v

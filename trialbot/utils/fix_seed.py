@@ -2,6 +2,7 @@ import torch
 import random
 import numpy as np
 
+
 def fix_seed(seed: int):
     """Sets random seed everywhere."""
     torch.manual_seed(seed)

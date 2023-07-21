@@ -23,6 +23,7 @@ PADDING_TOKEN = "@@PADDING@@"
 START_SYMBOL = '@start@'
 END_SYMBOL = '@end@'
 
+
 class _NamespaceDependentDefaultDict(defaultdict):
     """
     This is a `defaultdict

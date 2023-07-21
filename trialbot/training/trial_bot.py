@@ -1,7 +1,7 @@
-from typing import Callable, Optional, Dict, Any
+import argparse
+from typing import Callable, Optional, Any
 import torch.nn
 import os.path
-import json
 from datetime import datetime
 
 from trialbot.data.dataset import Dataset
@@ -18,6 +18,7 @@ from . import extensions as exts
 import logging
 logging.basicConfig()
 
+
 class Events(Enum):
     """Predefined events for TrialBot training."""
     EPOCH_STARTED = "epoch_started"
@@ -28,11 +29,13 @@ class Events(Enum):
     ITERATION_COMPLETED = "iteration_completed"
     EXCEPTION_RAISED = "exception_raised"
 
+
 class State(object):
     """An object that is used to pass internal and user-defined state between event handlers."""
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
+
 
 class TrialBot:
     """
@@ -70,8 +73,8 @@ class TrialBot:
 
     """
     def __init__(self,
-                 args = None,
-                 trial_name="default_savedir",
+                 args: argparse.Namespace | None = None,
+                 trial_name: str = "default_savedir",
                  get_model_func: Optional[Callable[[Any, NSVocabulary], torch.nn.Module]] = None,
                  clean_engine: bool = False,
                  ):
@@ -130,9 +133,7 @@ class TrialBot:
     def get_default_parser():
         parser = get_trial_bot_common_opt_parser()
         parser.add_argument('models', nargs='*', help='pretrained models for the same setting')
-        parser.add_argument('--dry-run', action="store_true")
-        parser.add_argument('--skip', type=int, help='skip NUM examples for the first iteration, intended for debug use.')
-        parser.add_argument('--vocab-dump', help="the file path to save and load the vocab obj")
+        parser.add_argument('--vocab-path', help="the file path to save and load the vocab obj")
 
         parser.add_argument('--batch-size', type=int, default=0,
                             help='overwrite the hparamset.batch_sz if specified at CLI')
@@ -180,6 +181,12 @@ class TrialBot:
 
     def _default_savepath(self):
         args = self.args
+
+        if args.test and len(args.models) > 0:
+            # use the first model path as the savepath,
+            # if this is not expected, please specify manually the
+            return os.path.abspath(os.path.expanduser(os.path.dirname(args.models[0])))
+
         return os.path.join(
             self.hparams.SNAPSHOT_PATH,
             args.dataset,
@@ -216,15 +223,20 @@ class TrialBot:
         args, logger = self.args, self.logger
         hparams = self.hparams
 
-        if args.vocab_dump and os.path.exists(args.vocab_dump):
-            logger.info(f"read vocab from file {args.vocab_dump}")
-            vocab = NSVocabulary.from_files(args.vocab_dump)
+        if args.vocab_path:
+            vocab_path = args.vocab_path
+        else:
+            vocab_path = os.path.join(self.savepath, 'vocab')
+            logger.info(f'assuming the vocab is located at {vocab_path}')
+
+        if os.path.exists(vocab_path):
+            logger.info(f"read vocab from file {vocab_path}")
+            vocab = NSVocabulary.from_files(vocab_path)
 
         else:
             logger.info("initialize vocab from training data")
             # count for a counter
-            logger.debug("start initializing vocab")
-            counter: Dict[str, Dict[str, int]] = dict()
+            counter: dict[str, dict[str, int]] = dict()
             for example in tqdm(iter(dataset)):
                 for namespace, w in translator.generate_namespace_tokens(example):
                     if namespace not in counter:
@@ -237,9 +249,12 @@ class TrialBot:
 
             vocab = NSVocabulary(counter, **hparams.NS_VOCAB_KWARGS)
 
-        if args.vocab_dump:
-            os.makedirs(args.vocab_dump, exist_ok=True)
-            vocab.save_to_files(args.vocab_dump)
+            if args.test:
+                logger.warning(f'the vocab is not saved by default in eval mode '
+                               f'although it is just built from scratch.')
+            else:
+                vocab.save_to_files(vocab_path)
+
         logger.info(str(vocab))
 
         return vocab
@@ -279,14 +294,10 @@ class TrialBot:
 
         else:
             # training procedure
-            # 1. save vocab; 2. init updater; 3. start main engine
+            # 1. ensure snapshot-dir (savepath); 2. init updater; 3. start main engine
             savepath = self.savepath
             if not os.path.exists(savepath):
                 os.makedirs(savepath, mode=0o755)
-            vocab_path = os.path.join(savepath, 'vocab')
-            if not os.path.exists(vocab_path):
-                os.makedirs(vocab_path, mode=0o755)
-                self.vocab.save_to_files(vocab_path)
 
             if self.updater is None:
                 from .updaters.training_updater import TrainingUpdater
@@ -343,6 +354,6 @@ class TrialBot:
             return handler
         return decorator
 
-    def add_event_handler(self, *args, **kwargs):
-        self._engine.add_event_handler(*args, **kwargs)
+    def add_event_handler(self, event_name, handler, priority=100, *args, **kwargs):
+        self._engine.add_event_handler(event_name, handler, priority, *args, **kwargs)
 

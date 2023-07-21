@@ -1,19 +1,29 @@
-from typing import List, Mapping, Generator, Tuple, Optional
+from typing import Any, TypeVar
+from collections.abc import Iterator
 from .ns_vocabulary import NSVocabulary
-import torch
+from abc import ABC
 
-NullableTensor = Optional[torch.Tensor]
 
-class _TranslationBase:
+T = TypeVar('T')
+
+
+class _TranslationBase(ABC):
     def __init__(self):
-        self.vocab: Optional[NSVocabulary] = None
+        self.vocab: NSVocabulary | None = None
 
-    def generate_namespace_tokens(self, example) -> Generator[Tuple[str, str], None, None]:
+    def generate_namespace_tokens(self, example) -> Iterator[tuple[str, str]]:
+        """
+        An iterator yields each time a tuple of namespace and token strings
+        """
         raise NotImplementedError
 
     def index_with_vocab(self, vocab: NSVocabulary):
         self.vocab = vocab
 
-    def to_tensor(self, example) -> Mapping[str, NullableTensor]:
+    def to_input(self, example) -> dict[str, T | None]:
+        """
+        Turn a single example into a dict, from string keys, to any value or None.
+        The value must be recognizable by the batch function,
+        while the None can indicate some irregular inputs that may be filtered during batch construction.
+        """
         raise NotImplementedError
-

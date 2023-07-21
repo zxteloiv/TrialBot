@@ -63,8 +63,9 @@ def print_models(bot):
 
 def collect_garbage(bot):
     import gc
-    for optim in bot.updater._optims:
-        optim.zero_grad()
+    from .updaters.training_updater import TrainingUpdater
+    if isinstance(bot.updater, TrainingUpdater):
+        bot.updater.optim.zero_grad()
 
     if hasattr(bot.state, "output") and bot.state.output is not None:
         bot.state.output = None

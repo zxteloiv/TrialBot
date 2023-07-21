@@ -22,7 +22,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-from typing import Sequence
+from collections.abc import Sequence
+
 
 class Iterator(object):
     """Base class of all dataset iterators.

@@ -1,8 +1,8 @@
 from ..dataset import Dataset, CompositionalDataset
-from typing import List
+
 
 class SequentialToDict(CompositionalDataset):
-    def __init__(self, dataset: Dataset, keys: List[str]):
+    def __init__(self, dataset: Dataset, keys: list[str]):
         super().__init__(dataset)
         self.keys = keys
 

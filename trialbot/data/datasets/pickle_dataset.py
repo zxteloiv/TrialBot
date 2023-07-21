@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional
 import pickle
 import logging
 from datetime import datetime as dt
@@ -6,10 +6,11 @@ import redis
 
 from trialbot.data.dataset import Dataset
 
+
 class PickleDataset(Dataset):
     def __init__(self,
                  filename: str,
-                 conn: Optional[Tuple[str, int, int]] = None,
+                 conn: Optional[tuple[str, int, int]] = None,
                  prefix: str = None,
                  ignore_missing_data: bool = True,
                  ):

@@ -1,8 +1,8 @@
-from typing import List
 from trialbot.data.dataset import Dataset
 
+
 class IndexDataset(Dataset):
-    def __init__(self, dataset_store: Dataset, index: List[int]):
+    def __init__(self, dataset_store: Dataset, index: list[int]):
         self._store = dataset_store
         self.index = index
 

@@ -1,5 +1,6 @@
-from typing import Union, Optional
+from typing import Optional
 import os.path
+
 
 def find_root(root_indicator_file: str = ".ROOT",
               startpoint: Optional[str] = None):
@@ -15,6 +16,7 @@ def find_root(root_indicator_file: str = ".ROOT",
     # return relative path in case of directory privacy
     return os.path.relpath(rootpath, os.curdir)
 
+
 def check_dir_(root_filename: str, dirpath: str):
     if root_filename in os.listdir(dirpath):
         return dirpath
@@ -26,13 +28,11 @@ def check_dir_(root_filename: str, dirpath: str):
 
     return check_dir_(root_filename, parent)
 
+
 def get_upper_level_dir_(dirpath: str) -> str:
     canonical_dirpath = os.path.normpath(os.path.abspath(dirpath))
     parent = os.path.join(canonical_dirpath, os.path.pardir)
     canonical_parent = os.path.normpath(parent)
 
     return canonical_parent
-
-
-
 
