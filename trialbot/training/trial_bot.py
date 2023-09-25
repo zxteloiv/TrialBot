@@ -84,12 +84,12 @@ class TrialBot:
                  runtime_hooks: dict[str, Callable] | None = None,
                  ):
         self.runtime_hooks = dict() if runtime_hooks is None else runtime_hooks
+        self.logger = logging.getLogger(__name__)
+        self.name = trial_name
 
         self.args = self._init_args(args)   # if given, use the given args, otherwise it will parse from sys.argv
-        self.name = trial_name
         self.hparams = self._init_hparams()
         self.savepath = self._init_savepath()
-        self.logger = logging.getLogger(__name__)
 
         self.updater = None
 
