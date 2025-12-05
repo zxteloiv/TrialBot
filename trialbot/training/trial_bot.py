@@ -10,6 +10,13 @@ from tqdm import tqdm
 from enum import Enum
 
 from trialbot.data.translator import Translator
+from trialbot.utils import (
+    setup_distributed_training,
+    cleanup_distributed_training,
+    prepare_model_for_multigpu,
+    parse_gpu_ids,
+    setup_deepspeed
+)
 
 from .opt_parser import get_trial_bot_common_opt_parser
 from .trial_registry import Registry
@@ -274,8 +281,38 @@ class TrialBot:
             for model, model_path in zip(models, args.models):
                 model.load_state_dict(torch.load(model_path, map_location=int_to_device(args.device)))
 
-        if args.device >= 0:
-            models = [model.cuda(args.device) for model in models]
+        # Setup distributed training if needed
+        self.distributed = setup_distributed_training(args)
+        
+        # Prepare models for multi-GPU training
+        gpu_ids = parse_gpu_ids(args.gpus)
+        prepared_models = []
+        
+        for i, model in enumerate(models):
+            # Prepare model for multi-GPU
+            model = prepare_model_for_multigpu(model, args, gpu_ids)
+            
+            # Handle DeepSpeed initialization
+            if args.deepspeed:
+                # DeepSpeed will be initialized later in the updater
+                # We just need to ensure the model is on the right device
+                if gpu_ids:
+                    model = model.cuda(gpu_ids[0])
+                elif args.device >= 0:
+                    model = model.cuda(args.device)
+            
+            prepared_models.append(model)
+        
+        models = prepared_models
+        
+        # Log multi-GPU configuration
+        if gpu_ids:
+            self.logger.info(f"Using GPUs: {gpu_ids}")
+            if self.distributed:
+                self.logger.info(f"Distributed training enabled with world_size: {args.world_size}")
+            if args.deepspeed:
+                self.logger.info("DeepSpeed training enabled")
+        
         return models
 
     def run(self, training_epoch: int = 0):
@@ -344,4 +381,3 @@ class TrialBot:
 
     def add_event_handler(self, event_name, handler, priority=100, *args, **kwargs):
         self.engine.add_event_handler(event_name, handler, priority, *args, **kwargs)
-

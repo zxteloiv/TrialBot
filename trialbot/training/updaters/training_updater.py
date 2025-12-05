@@ -1,6 +1,13 @@
 import logging
 from collections.abc import Sequence
 from trialbot.utils.move_to_device import move_to_device
+from trialbot.utils.multi_gpu import (
+    move_to_device_multigpu,
+    parse_gpu_ids,
+    setup_deepspeed,
+    is_distributed,
+    get_rank
+)
 import torch.nn
 from ..trial_bot import TrialBot
 from trialbot.data.iterators import RandomIterator
@@ -15,6 +22,8 @@ class BatchMixin:
     dataset: Dataset
     translator: Translator
     device: int
+    gpu_ids: list = None
+    args = None
 
     def next_batch(self) -> dict | None:
         indices: Sequence[int] = next(self.iterator)
@@ -27,15 +36,16 @@ class BatchMixin:
             )
             return None
 
-        if self.device >= 0:
-            batch = move_to_device(batch, self.device)
+        # Use multi-GPU aware device movement
+        batch = move_to_device_multigpu(batch, self.device, self.gpu_ids)
 
         return batch
 
 
 class TrainingUpdater(Updater, BatchMixin):
     def __init__(self, dataset, translator, model, iterator, optim,
-                 device: int = -1, grad_clip_value: float = 0.):
+                 device: int = -1, grad_clip_value: float = 0.,
+                 args=None, gpu_ids=None):
         """
         Assuming the training operates on only one dataset, one model, one iterator,
         and one optimizer.
@@ -48,6 +58,32 @@ class TrainingUpdater(Updater, BatchMixin):
         self.grad_clip_value = grad_clip_value
         self.device = device
         self.optim = optim
+        self.args = args
+        self.gpu_ids = gpu_ids
+        self.deepspeed_engine = None
+        
+        # Initialize DeepSpeed if needed
+        if args and args.deepspeed:
+            self._init_deepspeed()
+
+    def _init_deepspeed(self):
+        """Initialize DeepSpeed engine."""
+        try:
+            import deepspeed
+            from trialbot.utils.multi_gpu import setup_deepspeed
+            
+            # Setup DeepSpeed
+            self.model, self.optim, _ = setup_deepspeed(
+                self.args, self.model, self.optim
+            )
+            self.deepspeed_engine = self.model
+            logging.getLogger(self.__class__.__name__).info(
+                "DeepSpeed engine initialized"
+            )
+        except ImportError:
+            logging.getLogger(self.__class__.__name__).warning(
+                "DeepSpeed not installed. Continuing without DeepSpeed."
+            )
 
     def update_epoch(self):
         model = self.model
@@ -56,7 +92,12 @@ class TrainingUpdater(Updater, BatchMixin):
         if batch is None:
             return None
 
-        output = model(**batch)
+        # For DeepSpeed, use engine forward
+        if self.deepspeed_engine is not None:
+            output = self.deepspeed_engine(**batch)
+        else:
+            output = model(**batch)
+        
         self.complete_iteration(output.get('loss'))
 
         if self.iterator.is_end_of_epoch:
@@ -68,6 +109,13 @@ class TrainingUpdater(Updater, BatchMixin):
         if loss is None:
             return
 
+        # Handle DeepSpeed backward
+        if self.deepspeed_engine is not None:
+            self.deepspeed_engine.backward(loss)
+            self.deepspeed_engine.step()
+            return
+
+        # Standard PyTorch backward
         optim = self.optim
         optim.zero_grad()
         loss.backward()
@@ -90,11 +138,31 @@ class TrainingUpdater(Updater, BatchMixin):
         repeat_iter = not args.debug
         shuffle_iter = not args.debug
 
-        iterator = RandomIterator(len(bot.train_set), bot.hparams.batch_sz,
+        # Adjust batch size for multi-GPU
+        batch_size = p.batch_sz
+        gpu_ids = parse_gpu_ids(args.gpus)
+        
+        # For distributed training, adjust batch size per GPU
+        if is_distributed():
+            try:
+                import torch.distributed as dist
+                world_size = dist.get_world_size()
+                # Divide batch size by world size for data parallelism
+                if world_size > 1:
+                    batch_size = max(1, batch_size // world_size)
+                    logger.info(f"Adjusted batch size to {batch_size} per GPU (world_size={world_size})")
+            except:
+                # Fallback to using gpu_ids length
+                if gpu_ids and len(gpu_ids) > 1:
+                    batch_size = max(1, batch_size // len(gpu_ids))
+                    logger.info(f"Adjusted batch size to {batch_size} per GPU (using {len(gpu_ids)} GPUs)")
+
+        iterator = RandomIterator(len(bot.train_set), batch_size,
                                   shuffle=shuffle_iter, repeat=repeat_iter)
         if args.debug and args.skip:
             iterator.reset(args.skip)
 
         updater = cls(bot.train_set, bot.translator, model, iterator, optim,
-                      device=args.device, grad_clip_value=p.GRAD_CLIPPING)
+                      device=args.device, grad_clip_value=p.GRAD_CLIPPING,
+                      args=args, gpu_ids=gpu_ids)
         return updater
